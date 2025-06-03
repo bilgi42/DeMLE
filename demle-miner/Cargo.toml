@@ -1,0 +1,39 @@
+[package]
+name = "demle-miner"
+version = "0.1.0"
+edition = "2021"
+description = "DEMLE cryptocurrency miner with FP8 ML operations"
+
+[[bin]]
+name = "demle-miner"
+path = "src/main.rs"
+
+[dependencies]
+demle-core = { path = "../demle-core" }
+demle-fp8 = { path = "../demle-fp8" }
+demle-rpc = { path = "../demle-rpc" }
+
+tokio = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# TUI
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+
+# Metrics and monitoring
+metrics = "0.21"
+metrics-exporter-prometheus = { version = "0.12", optional = true }
+
+[features]
+default = []
+gpu = ["demle-fp8/gpu"]
+cuda = ["demle-fp8/cuda"]
+prometheus = ["metrics-exporter-prometheus"] 

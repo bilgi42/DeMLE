@@ -1,0 +1,33 @@
+[package]
+name = "demle-fp8"
+version = "0.1.0"
+edition = "2021"
+description = "FP8 machine learning operations for DEMLE mining"
+
+[dependencies]
+demle-core = { path = "../demle-core" }
+nalgebra = { workspace = true }
+half = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }
+
+# Optional GPU support
+candle-core = { workspace = true, optional = true }
+wgpu = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+default = []
+gpu = ["candle-core", "wgpu"]
+cuda = ["candle-core/cuda"]
+
+[[bench]]
+name = "fp8_operations"
+harness = false 

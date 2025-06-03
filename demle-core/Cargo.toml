@@ -1,0 +1,19 @@
+[package]
+name = "demle-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core data structures and utilities for DEMLE"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+
+# Cryptography
+sha3 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+proptest = { workspace = true } 
