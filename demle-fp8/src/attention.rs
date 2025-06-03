@@ -77,7 +77,8 @@ fn execute_attention_gpu(
     let mut total_flops = 0u64;
     let mut final_output = None;
 
-    for iteration in 0..25 { // Increased to 25 for maximum H100 utilization
+    // Balanced attention iterations for H100 (memory optimized)
+    for iteration in 0..15 { // Reduced from 25 to 15 for memory balance
         // Compute attention scores (Q @ K^T)
         let q_reshaped = q_heads.reshape((batch_size * num_heads, seq_length, d_k))?;
         let k_reshaped = k_heads.reshape((batch_size * num_heads, seq_length, d_k))?;
