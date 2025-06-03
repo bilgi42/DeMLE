@@ -1,0 +1,37 @@
+# H100 optimized Docker image for DEMLE mining
+FROM nvidia/cuda:12.2-devel-ubuntu22.04
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Set up CUDA environment
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Create app directory
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Build the optimized miner
+RUN cd demle-miner && \
+    cargo build --release --features cuda
+
+# Set up runtime environment
+ENV RUST_LOG=info
+ENV DEMLE_GPU_ENABLED=true
+
+# Default command
+CMD ["./target/release/demle-miner"] 

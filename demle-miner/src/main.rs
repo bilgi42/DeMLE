@@ -27,7 +27,7 @@ struct Args {
     rpc_url: String,
     
     /// Contract address for DEMLE token
-    #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
+    #[arg(long)]
     contract: String,
 }
 

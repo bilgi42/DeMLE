@@ -13,20 +13,20 @@ demle-core = { path = "../demle-core" }
 demle-fp8 = { path = "../demle-fp8" }
 demle-rpc = { path = "../demle-rpc" }
 
-tokio = { workspace = true }
+tokio = { version = "1.0", features = ["full"] }
 rayon = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # TUI
 crossterm = { workspace = true }
 ratatui = { workspace = true }
 
 # CLI
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 
 # Utilities
 md5 = "0.7"
@@ -34,6 +34,11 @@ md5 = "0.7"
 # Metrics and monitoring
 metrics = "0.21"
 metrics-exporter-prometheus = { version = "0.12", optional = true }
+
+# GPU acceleration with Candle
+candle-core = { version = "0.3", features = ["cuda"] }
+candle-nn = "0.3"
+candle-transformers = "0.3"
 
 [features]
 default = []
