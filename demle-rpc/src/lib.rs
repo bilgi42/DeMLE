@@ -5,6 +5,7 @@ use demle_core::{DemleError, NetworkConfig, Result};
 use web3::contract::{Contract, Options};
 use web3::types::{Address, Bytes, H256, U256};
 use web3::Web3;
+use sha3::{Digest, Sha3_256};
 
 /// RPC client for DEMLE blockchain interactions
 pub struct DemleRpcClient {
@@ -85,15 +86,34 @@ impl DemleRpcClient {
             work_result.total_flops
         );
 
-        // Create nonce from work nonce
-        let nonce_bytes = work_result.nonce.to_be_bytes();
-        let mut nonce_array = [0u8; 32];
-        nonce_array[24..].copy_from_slice(&nonce_bytes);
-        let nonce = H256::from(nonce_array);
+        // Create a proper 32-byte nonce by hashing the work result nonce and work_id
+        let nonce_input = format!("{}:{}", work_result.nonce, work_result.work_id);
+        let nonce_hash = Sha3_256::digest(nonce_input.as_bytes());
+        let nonce = H256::from_slice(&nonce_hash);
         
-        // Create ML proof from work result
-        let ml_proof = serde_json::to_vec(work_result)
+        // Create ML proof from work result - add some additional verification data
+        let proof_data = serde_json::json!({
+            "work_id": work_result.work_id,
+            "nonce": work_result.nonce,
+            "hash": work_result.hash,
+            "execution_time_ms": work_result.execution_time_ms,
+            "total_flops": work_result.total_flops,
+            "operation_results": work_result.operation_results,
+            "timestamp": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            "verification": "demle_fp8_mining_proof"
+        });
+        
+        let ml_proof = serde_json::to_vec(&proof_data)
             .map_err(|e| DemleError::SerializationError(format!("Failed to serialize proof: {}", e)))?;
+        
+        tracing::debug!(
+            "Submitting nonce: {:?}, proof size: {} bytes",
+            nonce,
+            ml_proof.len()
+        );
         
         // Get accounts (use first account as default)
         let accounts = self.web3.eth().accounts().await
