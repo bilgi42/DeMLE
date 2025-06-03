@@ -15,8 +15,9 @@ tracing = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
 
-# Optional GPU support
-candle-core = { version = "0.9", optional = true }
+# GPU support with CUDA
+candle-core = { version = "0.9", optional = true, features = ["cuda"] }
+candle-nn = { version = "0.9", optional = true }
 wgpu = { version = "0.19", optional = true }
 
 [dev-dependencies]
@@ -25,5 +26,5 @@ proptest = { workspace = true }
 
 [features]
 default = []
-gpu = ["candle-core", "wgpu"]
-cuda = ["candle-core/cuda"] 
+gpu = ["candle-core", "candle-nn", "wgpu"]
+cuda = ["candle-core", "candle-nn"] 

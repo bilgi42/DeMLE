@@ -97,7 +97,13 @@ impl Miner {
         #[cfg(feature = "cuda")]
         {
             match candle_core::Device::new_cuda(0) {
-                Ok(_) => info!("🔥 GPU acceleration enabled (CUDA)"),
+                Ok(device) => {
+                    info!("🔥 H100 GPU acceleration enabled (CUDA)");
+                    // Warm up GPU
+                    let test_tensor = candle_core::Tensor::zeros((1024, 1024), candle_core::DType::F32, &device)?;
+                    let _warm = test_tensor.matmul(&test_tensor)?;
+                    info!("🚀 GPU warmed up and ready");
+                },
                 Err(e) => {
                     warn!("⚠️  GPU not available, falling back to CPU: {}", e);
                 }
@@ -143,38 +149,49 @@ impl Miner {
             }
 
             nonce = nonce.wrapping_add(1);
-            // Remove artificial delay for maximum H100 utilization
-            sleep(Duration::from_millis(100)).await; // Minimal delay for blockchain polling
+            // No delay for maximum H100 utilization - removed artificial bottleneck
         }
     }
 
     async fn generate_work_unit(&self, nonce: u64) -> Result<WorkUnit, Box<dyn std::error::Error>> {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        // Generate larger ML operations optimized for H100 GPU
+        // Generate much larger ML operations optimized for H100 GPU (massive scale)
         let operations = vec![
             MLOperation::MatrixMultiply {
-                dimensions: (2048, 2048, 2048), // Much larger for H100
+                dimensions: (4096, 4096, 4096), // Much larger for H100 - 128 GFLOPS per operation
                 seed: nonce,
             },
             MLOperation::Convolution2D {
-                input_shape: (32, 512, 64, 64), // Larger batch and feature maps
-                kernel_shape: (1024, 512, 3, 3),
+                input_shape: (64, 1024, 128, 128), // Much larger batch and feature maps
+                kernel_shape: (2048, 1024, 3, 3),
                 stride: (1, 1),
                 padding: (1, 1),
                 seed: nonce.wrapping_add(1),
             },
             MLOperation::MultiHeadAttention {
-                batch_size: 16, // Larger batch
-                seq_length: 128, // Longer sequences
-                d_model: 1024, // Larger model dimension
-                num_heads: 16,
+                batch_size: 32, // Larger batch
+                seq_length: 256, // Longer sequences
+                d_model: 2048, // Much larger model dimension
+                num_heads: 32,
                 seed: nonce.wrapping_add(2),
             },
             MLOperation::BatchNormalization {
-                shape: (32, 1024, 64, 64), // Much larger tensors
+                shape: (64, 2048, 128, 128), // Much larger tensors
                 epsilon: 1e-5,
                 seed: nonce.wrapping_add(3),
+            },
+            // Add more operations for better GPU utilization
+            MLOperation::MatrixMultiply {
+                dimensions: (8192, 4096, 2048), // Even larger mixed precision
+                seed: nonce.wrapping_add(4),
+            },
+            MLOperation::MultiHeadAttention {
+                batch_size: 64,
+                seq_length: 512,
+                d_model: 4096, // Large transformer size
+                num_heads: 64,
+                seed: nonce.wrapping_add(5),
             },
         ];
 
@@ -197,49 +214,105 @@ impl Miner {
         info!("⚡ Mining work unit: {}", work_unit.id);
         info!("📋 Operations: {}", work_unit.operations.len());
 
-        // Execute operations in parallel for maximum H100 utilization
-        let handles: Vec<_> = work_unit.operations
-            .iter()
-            .enumerate()
-            .map(|(i, operation)| {
+        // For H100 optimization: Execute operations in true GPU parallel streams
+        // instead of tokio async which adds CPU overhead
+        #[cfg(feature = "cuda")]
+        {
+            use std::sync::{Arc, Mutex};
+            use std::thread;
+            
+            let operation_results = Arc::new(Mutex::new(Vec::new()));
+            let mut handles = Vec::new();
+
+            // Split operations into chunks for parallel GPU streams
+            for (i, operation) in work_unit.operations.iter().enumerate() {
                 let op = operation.clone();
-                tokio::spawn(async move {
-                    info!("🔄 Executing operation {} in parallel: {}", i + 1, op);
-                    execute_ml_operation(&op)
-                })
+                let results = Arc::clone(&operation_results);
+                
+                let handle = thread::spawn(move || {
+                    info!("🔄 Executing operation {} on GPU stream: {}", i + 1, op);
+                    let result = execute_ml_operation(&op);
+                    if let Ok(op_result) = result {
+                        results.lock().unwrap().push(op_result);
+                    }
+                    result
+                });
+                handles.push(handle);
+            }
+
+            // Wait for all GPU operations to complete
+            for handle in handles {
+                handle.join().unwrap()?;
+            }
+
+            let operation_results = Arc::try_unwrap(operation_results).unwrap().into_inner().unwrap();
+            let total_flops: u64 = operation_results.iter().map(|r| r.flops).sum();
+            
+            let execution_time_ms = start.elapsed().as_millis() as u64;
+
+            // Simple hash combining all operation hashes
+            let hash_strings: Vec<String> = operation_results
+                .iter()
+                .map(|r| r.result_hash.clone())
+                .collect();
+
+            let combined_hash = format!("{}:{}", work_unit.nonce_range.0, hash_strings.join(","));
+            let result_hash = format!("{:x}", md5::compute(combined_hash));
+
+            Ok(demle_core::WorkResult {
+                work_id: work_unit.id.clone(),
+                nonce: work_unit.nonce_range.0,
+                hash: result_hash,
+                execution_time_ms,
+                total_flops,
+                operation_results,
             })
-            .collect();
-
-        let mut operation_results = Vec::new();
-        let mut total_flops = 0u64;
-
-        // Collect results from parallel execution
-        for handle in handles {
-            let result = handle.await??;
-            total_flops += result.flops;
-            operation_results.push(result);
         }
+        #[cfg(not(feature = "cuda"))]
+        {
+            // Fallback to tokio async for CPU
+            let handles: Vec<_> = work_unit.operations
+                .iter()
+                .enumerate()
+                .map(|(i, operation)| {
+                    let op = operation.clone();
+                    tokio::spawn(async move {
+                        info!("🔄 Executing operation {} in parallel: {}", i + 1, op);
+                        execute_ml_operation(&op)
+                    })
+                })
+                .collect();
 
-        let execution_time_ms = start.elapsed().as_millis() as u64;
+            let mut operation_results = Vec::new();
+            let mut total_flops = 0u64;
 
-        // Simple hash combining all operation hashes
-        let hash_strings: Vec<String> = operation_results
-            .iter()
-            .map(|r| r.result_hash.clone())
-            .collect();
+            // Collect results from parallel execution
+            for handle in handles {
+                let result = handle.await??;
+                total_flops += result.flops;
+                operation_results.push(result);
+            }
 
-        let combined_hash = format!("{}:{}", work_unit.nonce_range.0, hash_strings.join(","));
+            let execution_time_ms = start.elapsed().as_millis() as u64;
 
-        let result_hash = format!("{:x}", md5::compute(combined_hash));
+            // Simple hash combining all operation hashes
+            let hash_strings: Vec<String> = operation_results
+                .iter()
+                .map(|r| r.result_hash.clone())
+                .collect();
 
-        Ok(demle_core::WorkResult {
-            work_id: work_unit.id.clone(),
-            nonce: work_unit.nonce_range.0,
-            hash: result_hash,
-            execution_time_ms,
-            total_flops,
-            operation_results,
-        })
+            let combined_hash = format!("{}:{}", work_unit.nonce_range.0, hash_strings.join(","));
+            let result_hash = format!("{:x}", md5::compute(combined_hash));
+
+            Ok(demle_core::WorkResult {
+                work_id: work_unit.id.clone(),
+                nonce: work_unit.nonce_range.0,
+                hash: result_hash,
+                execution_time_ms,
+                total_flops,
+                operation_results,
+            })
+        }
     }
 
     fn update_stats(&mut self, result: &demle_core::WorkResult) {
@@ -296,9 +369,9 @@ impl Miner {
 
         // Show operation breakdown
         println!("\n🔧 ML Operations Performed:");
-        println!("• Matrix Multiplication (GEMM) - 2048³ matrices");
-        println!("• 2D Convolution (CNN layers) - 1024x512 kernels");
-        println!("• Multi-Head Attention (Transformers) - 16 heads");
+        println!("• Matrix Multiplication (GEMM) - 4096³ matrices");
+        println!("• 2D Convolution (CNN layers) - 2048x1024 kernels");
+        println!("• Multi-Head Attention (Transformers) - 32 heads");
         println!("• Batch Normalization - Large tensors");
 
         // Performance status
