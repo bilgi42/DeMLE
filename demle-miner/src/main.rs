@@ -13,11 +13,11 @@ use candle_core;
 #[command(about = "DEMLE FP8 ML cryptocurrency miner")]
 struct Args {
     /// Number of mining threads
-    #[arg(short = 'j', long, default_value = "4")]
+    #[arg(short = 'j', long, default_value = "64")]
     threads: usize,
 
     /// Mining target in teraflops
-    #[arg(short, long, default_value = "1.0")]
+    #[arg(short, long, default_value = "150.0")]
     target_teraflops: f64,
 
     /// Enable verbose logging
@@ -155,42 +155,58 @@ impl Miner {
     async fn generate_work_unit(&self, nonce: u64) -> Result<WorkUnit, Box<dyn std::error::Error>> {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        // Generate much larger ML operations optimized for H100 GPU (massive scale)
+        // H100-optimized ML operations - much larger for tensor core utilization
         let operations = vec![
+            // Massive GEMM operations for H100 tensor cores
             MLOperation::MatrixMultiply {
-                dimensions: (4096, 4096, 4096), // Much larger for H100 - 128 GFLOPS per operation
+                dimensions: (8192, 8192, 8192), // 2TB FLOPS per operation
                 seed: nonce,
             },
-            MLOperation::Convolution2D {
-                input_shape: (64, 1024, 128, 128), // Much larger batch and feature maps
-                kernel_shape: (2048, 1024, 3, 3),
-                stride: (1, 1),
-                padding: (1, 1),
+            MLOperation::MatrixMultiply {
+                dimensions: (16384, 8192, 4096), // Mixed dimensions for variety
                 seed: nonce.wrapping_add(1),
             },
-            MLOperation::MultiHeadAttention {
-                batch_size: 32, // Larger batch
-                seq_length: 256, // Longer sequences
-                d_model: 2048, // Much larger model dimension
-                num_heads: 32,
+            MLOperation::MatrixMultiply {
+                dimensions: (12288, 12288, 6144), // Large asymmetric
                 seed: nonce.wrapping_add(2),
             },
-            MLOperation::BatchNormalization {
-                shape: (64, 2048, 128, 128), // Much larger tensors
-                epsilon: 1e-5,
+            // Large convolution for image processing workloads
+            MLOperation::Convolution2D {
+                input_shape: (128, 2048, 256, 256), // Massive batch and feature maps
+                kernel_shape: (4096, 2048, 3, 3),
+                stride: (1, 1),
+                padding: (1, 1),
                 seed: nonce.wrapping_add(3),
             },
-            // Add more operations for better GPU utilization
-            MLOperation::MatrixMultiply {
-                dimensions: (8192, 4096, 2048), // Even larger mixed precision
+            // Large transformer attention
+            MLOperation::MultiHeadAttention {
+                batch_size: 64,
+                seq_length: 1024, // Long sequences
+                d_model: 4096, // Large model
+                num_heads: 64,
                 seed: nonce.wrapping_add(4),
             },
             MLOperation::MultiHeadAttention {
-                batch_size: 64,
+                batch_size: 128,
                 seq_length: 512,
-                d_model: 4096, // Large transformer size
-                num_heads: 64,
+                d_model: 8192, // Huge model
+                num_heads: 128,
                 seed: nonce.wrapping_add(5),
+            },
+            // Large batch normalization
+            MLOperation::BatchNormalization {
+                shape: (128, 4096, 256, 256), // Massive tensors
+                epsilon: 1e-5,
+                seed: nonce.wrapping_add(6),
+            },
+            // Additional GEMM operations to saturate H100
+            MLOperation::MatrixMultiply {
+                dimensions: (20480, 10240, 5120), // Even larger
+                seed: nonce.wrapping_add(7),
+            },
+            MLOperation::MatrixMultiply {
+                dimensions: (24576, 8192, 8192), // Max tensor core utilization
+                seed: nonce.wrapping_add(8),
             },
         ];
 

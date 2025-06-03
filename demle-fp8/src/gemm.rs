@@ -67,8 +67,8 @@ fn execute_gemm_gpu(dimensions: (usize, usize, usize), seed: u64) -> Result<(Str
     let mut total_flops = 0u64;
     let mut all_results = Vec::new();
     
-    // Execute multiple operations to fully saturate H100
-    for batch in 0..4 { // 4 batches for better GPU utilization
+    // Execute many more operations to fully saturate H100 (increased from 4 to 16)
+    for batch in 0..16 { // 16 concurrent batches for maximum H100 utilization
         let c_tensor = a_tensor.matmul(&b_tensor).map_err(|e| {
             DemleError::ComputationError(format!("GPU GEMM batch {} failed: {}", batch, e))
         })?;

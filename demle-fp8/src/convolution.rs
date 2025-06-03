@@ -80,7 +80,7 @@ fn execute_conv2d_gpu(
     let mut final_output = None;
 
     // Execute multiple convolution batches to saturate H100
-    for conv_batch in 0..6 { // Multiple convolution operations
+    for conv_batch in 0..12 { // Increased from 6 to 12 operations for H100
         let output_tensor = input_tensor.conv2d(&kernel_tensor, ph, pw, sh, sw).map_err(|e| {
             DemleError::ComputationError(format!("GPU Conv2D batch {} failed: {}", conv_batch, e))
         })?;
