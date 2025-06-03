@@ -6,6 +6,8 @@ use web3::contract::{Contract, Options};
 use web3::types::{Address, Bytes, H256, U256};
 use web3::Web3;
 use sha3::{Digest, Sha3_256};
+use rand::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// RPC client for DEMLE blockchain interactions
 pub struct DemleRpcClient {
@@ -86,8 +88,11 @@ impl DemleRpcClient {
             work_result.total_flops
         );
 
-        // Create a proper 32-byte nonce by hashing the work result nonce and work_id
-        let nonce_input = format!("{}:{}", work_result.nonce, work_result.work_id);
+        // Create a unique 32-byte nonce by combining work data with timestamp and random component
+        // This ensures every submission is unique for the demo
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let random_value: u64 = rand::thread_rng().gen();
+        let nonce_input = format!("{}:{}:{}:{}", work_result.nonce, work_result.work_id, timestamp, random_value);
         let nonce_hash = Sha3_256::digest(nonce_input.as_bytes());
         let nonce = H256::from_slice(&nonce_hash);
         

@@ -36,12 +36,12 @@ metrics = "0.21"
 metrics-exporter-prometheus = { version = "0.12", optional = true }
 
 # GPU acceleration with Candle
-candle-core = { version = "0.9", features = ["cuda"] }
-candle-nn = "0.9"
-candle-transformers = "0.9"
+candle-core = { version = "0.9", features = ["cuda"], optional = true }
+candle-nn = { version = "0.9", optional = true }
+candle-transformers = { version = "0.9", optional = true }
 
 [features]
 default = []
-gpu = ["demle-fp8/gpu"]
-cuda = ["demle-fp8/cuda"]
+gpu = ["demle-fp8/gpu", "candle-core", "candle-nn", "candle-transformers"]
+cuda = ["demle-fp8/cuda", "candle-core", "candle-nn", "candle-transformers"]
 prometheus = ["metrics-exporter-prometheus"] 
