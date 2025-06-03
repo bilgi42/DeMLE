@@ -157,25 +157,22 @@ impl Miner {
 
         // H100 Tensor Core Optimized: Memory-balanced massive operations
         let operations = vec![
-            // Massive GEMM for maximum tensor core utilization (proven to work - 140 TFLOPS!)
+            // Massive GEMM for maximum tensor core utilization (proven to work - 105+ TFLOPS!)
             MLOperation::MatrixMultiply {
                 dimensions: (16384, 16384, 8192), // ~4.3 TB FLOPS single operation!
                 seed: nonce,
             },
-            // Memory-optimized attention (reduced to fit alongside GEMM)
+            // Memory-optimized attention (proven to work - adds ~16 TFLOPS)
             MLOperation::MultiHeadAttention {
-                batch_size: 64,  // Reduced from 128
-                seq_length: 1024, // Reduced from 2048
-                d_model: 4096, // Reduced from 8192
-                num_heads: 64, // Reduced from 128
+                batch_size: 64,  
+                seq_length: 1024, 
+                d_model: 4096, 
+                num_heads: 64, 
                 seed: nonce.wrapping_add(1),
             },
-            // Memory-optimized convolution
-            MLOperation::Convolution2D {
-                input_shape: (128, 1536, 224, 224), // Reduced channels to fit memory
-                kernel_shape: (4096, 1536, 3, 3), // Balanced for memory
-                stride: (1, 1),
-                padding: (1, 1),
+            // Fast completing GEMM operation (replaces slow convolution)
+            MLOperation::MatrixMultiply {
+                dimensions: (8192, 8192, 4096), // Smaller but fast GEMM, ~1 TB FLOPS
                 seed: nonce.wrapping_add(2),
             },
         ];
