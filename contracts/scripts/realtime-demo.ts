@@ -260,7 +260,7 @@ async function main() {
             <div class="address" onclick="copyToClipboard('${contractAddress}')">${contractAddress}</div>
             <p><strong>Network:</strong> Hardhat Local (localhost:8545, Chain ID: 31337)</p>
             <p><strong>Command to run your Rust miner:</strong></p>
-            <pre>cargo run --bin demle-miner -- --contract ${contractAddress} --rpc http://localhost:8545</pre>
+            <pre>cargo run --bin demle-miner -- --contract ${contractAddress} --rpc-url http://localhost:8545</pre>
             <p><em>💡 Click the contract address to copy it!</em></p>
         </div>
 
@@ -591,7 +591,7 @@ async function main() {
 🚀 How to use:
 1. Open realtime-dashboard.html in your browser
 2. Start Hardhat node: npx hardhat node
-3. Run your miner: cargo run --bin demle-miner -- --contract ${contractAddress} --rpc http://localhost:8545
+3. Run your miner: cargo run --bin demle-miner -- --contract ${contractAddress} --rpc-url http://localhost:8545
 4. Watch the dashboard update live as tokens are distributed!
 
 ⏱️  Dashboard polls every 3 seconds for updates

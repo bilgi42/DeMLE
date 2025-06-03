@@ -1,4 +1,30 @@
+import { ethers } from "hardhat";
+import { writeFileSync } from "fs";
 
+async function main() {
+  console.log("🚀 Setting up DEMLE Demo Environment...");
+  console.log("=" .repeat(60));
+
+  // Deploy contract first
+  const [deployer] = await ethers.getSigners();
+  console.log("🏗️  Deploying with account:", deployer.address);
+  console.log("💰 Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
+
+  const DEMLE = await ethers.getContractFactory("DEMLE");
+  console.log("📦 Deploying DEMLE contract...");
+  
+  const demle = await DEMLE.deploy();
+  await demle.waitForDeployment();
+  const contractAddress = await demle.getAddress();
+
+  console.log("\n✅ Contract Deployed Successfully!");
+  console.log("📍 Contract Address:", contractAddress);
+  console.log("⛽ Mining Reward:", ethers.formatEther(await demle.MINING_REWARD()), "DEMLE");
+  console.log("🏦 Max Supply:", ethers.formatEther(await demle.MAX_SUPPLY()), "DEMLE");
+  console.log("⚡ Initial Difficulty:", await demle.getMiningDifficulty());
+
+  // Create the dashboard HTML
+  const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -124,10 +150,10 @@
 
         <div class="setup-info">
             <h3>📍 Contract Information</h3>
-            <p><strong>Contract Address:</strong> <span class="address" onclick="copyToClipboard('0x5FbDB2315678afecb367f032d93F642f64180aa3')">0x5FbDB2315678afecb367f032d93F642f64180aa3</span></p>
+            <p><strong>Contract Address:</strong> <span class="address" onclick="copyToClipboard('${contractAddress}')">${contractAddress}</span></p>
             <p><strong>Network:</strong> Hardhat Local (localhost:8545, Chain ID: 31337)</p>
             <p><strong>Command to run your Rust miner:</strong></p>
-            <div class="command-box">cargo run --bin demle-miner -- --contract 0x5FbDB2315678afecb367f032d93F642f64180aa3 --rpc-url http://localhost:8545</div>
+            <div class="command-box">cargo run --bin demle-miner -- --contract ${contractAddress} --rpc-url http://localhost:8545</div>
             <p><em>💡 Click the contract address to copy it!</em></p>
         </div>
 
@@ -160,7 +186,7 @@
     </div>
 
     <script>
-        const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+        const CONTRACT_ADDRESS = '${contractAddress}';
         const RPC_URL = 'http://localhost:8545';
         
         const CONTRACT_ABI = [
@@ -215,7 +241,7 @@
                 const accounts = [];
                 for (let i = 0; i < 20; i++) {
                     try {
-                        const address = ethers.utils.computeAddress(`0x${i.toString().padStart(64, '0')}`);
+                        const address = ethers.utils.computeAddress(\`0x\${i.toString().padStart(64, '0')}\`);
                         accounts.push(address);
                     } catch (e) {
                         // Skip invalid addresses
@@ -241,7 +267,7 @@
                                 address: address,
                                 balance: balance,
                                 lastMiningTime: lastMiningTime,
-                                name: `Miner ${knownMiners.size + 1}`
+                                name: \`Miner \${knownMiners.size + 1}\`
                             });
                         }
                     } catch (e) {
@@ -260,28 +286,28 @@
             const minersGrid = document.getElementById('minersGrid');
             
             if (knownMiners.size === 0) {
-                minersGrid.innerHTML = `
+                minersGrid.innerHTML = \`
                     <div class="no-miners">
                         Waiting for miners... Start your miner to see it appear here!<br>
                         <small>Dashboard updates every 3 seconds</small>
                     </div>
-                `;
+                \`;
                 return;
             }
             
             const miners = Array.from(knownMiners.values());
-            minersGrid.innerHTML = miners.map((miner, index) => `
+            minersGrid.innerHTML = miners.map((miner, index) => \`
                 <div class="miner-card">
-                    <h4>⛏️ ${miner.name}</h4>
-                    <p><strong>Address:</strong> ${miner.address.slice(0, 10)}...${miner.address.slice(-8)}</p>
-                    <p><strong>Balance:</strong> ${ethers.utils.formatEther(miner.balance)} DEMLE</p>
-                    <p><strong>Last Mining:</strong> ${
+                    <h4>⛏️ \${miner.name}</h4>
+                    <p><strong>Address:</strong> \${miner.address.slice(0, 10)}...\${miner.address.slice(-8)}</p>
+                    <p><strong>Balance:</strong> \${ethers.utils.formatEther(miner.balance)} DEMLE</p>
+                    <p><strong>Last Mining:</strong> \${
                         miner.lastMiningTime.gt(0) 
                             ? new Date(miner.lastMiningTime.toNumber() * 1000).toLocaleString()
                             : 'Never'
                     }</p>
                 </div>
-            `).join('');
+            \`).join('');
         }
 
         function copyToClipboard(text) {
@@ -301,4 +327,48 @@
         window.addEventListener('load', init);
     </script>
 </body>
-</html>
+</html>`;
+
+  // Write the HTML file
+  writeFileSync('./demle-dashboard.html', html);
+
+  console.log("\n✅ Demo Environment Setup Complete!");
+  console.log("=" .repeat(60));
+  console.log("📁 Dashboard: demle-dashboard.html");
+  console.log("🌐 Open the dashboard file in your browser");
+  console.log("📍 Contract:", contractAddress);
+  console.log("🔗 Network: Hardhat Local (localhost:8545)");
+
+  console.log("\n🚀 Quick Start Guide:");
+  console.log("1. Open demle-dashboard.html in your browser");
+  console.log("2. Keep Hardhat node running: npx hardhat node");
+  console.log("3. Start mining:");
+  console.log(`   cargo run --bin demle-miner -- --contract ${contractAddress} --rpc-url http://localhost:8545`);
+  console.log("4. Watch the dashboard update live!");
+
+  console.log("\n📊 Monitor with:");
+  console.log("   npx hardhat run scripts/check-real-balances.ts --network localhost");
+
+  // Keep the script running to maintain the network
+  console.log("\n🔄 Keeping script running to maintain network...");
+  console.log("   Press Ctrl+C to stop");
+  
+  // Simple monitoring loop
+  setInterval(async () => {
+    try {
+      const totalSupply = await demle.totalSupply();
+      const blockNumber = await ethers.provider.getBlockNumber();
+      
+      if (Number(totalSupply) > 0) {
+        console.log(`📊 Block ${blockNumber}: ${ethers.formatEther(totalSupply)} DEMLE distributed`);
+      }
+    } catch (error) {
+      console.error('Monitor error:', error);
+    }
+  }, 10000); // Log every 10 seconds
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+}); 

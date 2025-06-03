@@ -12,9 +12,11 @@
     "clean": "hardhat clean",
     "demo": "hardhat run scripts/simple-demo.ts",
     "check-balances": "hardhat run scripts/check-balances.ts",
+    "check-live-balances": "hardhat run scripts/check-real-balances.ts --network localhost",
     "dashboard": "hardhat run scripts/web-dashboard.ts",
     "live-dashboard": "hardhat run scripts/live-dashboard.ts",
-    "realtime-demo": "hardhat run scripts/realtime-demo.ts"
+    "realtime-demo": "hardhat run scripts/realtime-demo.ts",
+    "setup-demo": "hardhat run scripts/setup-demo.ts --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
