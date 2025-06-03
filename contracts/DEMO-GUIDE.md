@@ -13,6 +13,9 @@ npm run check-balances
 
 # 3. Generate visual web dashboard
 npm run dashboard
+
+# 4. 🆕 REAL-TIME Dashboard - Updates live as miners work!
+npm run realtime-demo
 ```
 
 ## 📊 What You'll See
@@ -69,6 +72,22 @@ Miner 1 attempting to mine...
 - **Activity Log**: Real-time mining operations history
 - **Contract Info**: Address and integration details
 
+### 4. **🆕 Real-time Dashboard** (`npm run realtime-demo`) - **RECOMMENDED!**
+- 🔥 **Connects to actual running miners**
+- ⚡ **Updates every 3 seconds automatically**
+- 🎯 **Shows YOUR miner as it earns tokens**
+- 📱 **Works with 1 miner or multiple miners**
+- 🎨 **Beautiful animations when mining succeeds**
+- 📊 **Live charts and statistics**
+
+**Key Features:**
+- **Live Monitoring**: Detects when your Rust miner connects and mines
+- **Real-time Updates**: Shows token balances updating as you earn DEMLE
+- **Multi-Miner Support**: If you run 2+ miners, shows all of them
+- **Mining Events**: Live feed of successful mining operations
+- **Visual Highlights**: Miner cards glow when they successfully mine
+- **Click to Copy**: Contract address copies to clipboard
+
 ## 🔧 How DEMLE Token Distribution Works
 
 ### Mining Process
@@ -83,6 +102,30 @@ Miner 1 attempting to mine...
 - **Mining Reward**: 100 DEMLE per successful proof
 - **Difficulty**: Adjusts based on total supply
 - **Standard**: ERC-20 compatible
+
+## 🆕 Real-time Dashboard Setup
+
+### Quick Start (RECOMMENDED):
+```bash
+# Terminal 1: Start the real-time dashboard
+npm run realtime-demo
+
+# Terminal 2: Start Hardhat node (if not running)
+npx hardhat node
+
+# Terminal 3: Run your miner
+cargo run --bin demle-miner -- --contract YOUR_CONTRACT_ADDRESS --rpc http://localhost:8545
+
+# Open realtime-dashboard.html in your browser
+# Watch your miner appear and earn tokens live!
+```
+
+### What You'll See in Real-time:
+- **Your miner appears** as soon as it submits its first proof
+- **Token balance updates** every 3 seconds 
+- **Mining events** show up immediately with animations
+- **Charts update** automatically as distribution changes
+- **Multiple miners** are supported if you run more than one
 
 ## 🧪 Demo Data Examples
 
@@ -111,12 +154,23 @@ let tx = contract.submit_mining_proof(nonce, ml_proof).send().await?;
 
 ## 📁 Generated Files
 
-- `demle-dashboard.html` - Interactive web dashboard
+- `realtime-dashboard.html` - 🆕 **Live dashboard that updates automatically**
+- `demle-dashboard.html` - Static interactive web dashboard
 - Console output - Real-time mining simulation
 - Contract addresses - For integration testing
 
 ## 🎮 Try It Now!
 
+### For Real Mining (RECOMMENDED):
+```bash
+# Start the live dashboard
+npm run realtime-demo
+
+# In another terminal, start your miner
+# The dashboard will show your miner and update live!
+```
+
+### For Quick Demos:
 1. **Start with the simple demo:**
    ```bash
    npm run demo
@@ -135,8 +189,15 @@ let tx = contract.submit_mining_proof(nonce, ml_proof).send().await?;
 
 ## 🏆 Expected Results
 
-After running the demos, you'll see:
-- **300-1400 DEMLE tokens** distributed among miners
+### With Real-time Dashboard:
+- **Your actual miner appears** when you start it
+- **Token balance grows** as you submit successful ML proofs
+- **Live events** show each mining success with timestamps
+- **Visual feedback** when mining operations complete
+- **Works with multiple miners** if you run them simultaneously
+
+### With Static Demos:
+- **300-1400 DEMLE tokens** distributed among simulated miners
 - **70-100% success rate** for mining operations
 - **Individual miner holdings** ranging from 0-400 DEMLE
 - **Real-time distribution statistics** and analytics
@@ -145,7 +206,10 @@ This demonstrates how your FP8 ML computations are rewarded with DEMLE tokens in
 
 ## 🚀 Next Steps
 
-1. **Connect Your Rust Miner**: Use the contract address from demos
-2. **Submit Real ML Proofs**: Replace demo data with actual FP8 computations
-3. **Monitor Token Distribution**: Use the dashboard to track real mining progress
-4. **Scale Up**: Deploy to testnet for multi-user mining 
+1. **🔥 Use Real-time Dashboard**: `npm run realtime-demo` for live monitoring
+2. **Connect Your Rust Miner**: Use the contract address from dashboard
+3. **Submit Real ML Proofs**: Replace demo data with actual FP8 computations
+4. **Monitor Live Progress**: Watch tokens accumulate in real-time
+5. **Scale Up**: Deploy to testnet for multi-user mining
+
+**The real-time dashboard is perfect for development and testing - you can see exactly when your miner succeeds and how tokens are distributed!** 

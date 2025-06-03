@@ -1,6 +1,7 @@
 use clap::Parser;
 use demle_core::{types::MiningStats, MLOperation, NetworkConfig, WorkUnit};
 use demle_fp8::{calculate_total_flops, execute_ml_operation, flops_to_teraflops};
+use demle_rpc::DemleRpcClient;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
@@ -24,6 +25,10 @@ struct Args {
     /// RPC URL for blockchain connection
     #[arg(long, default_value = "http://localhost:8545")]
     rpc_url: String,
+    
+    /// Contract address for DEMLE token
+    #[arg(long, default_value = "0x5FbDB2315678afecb367f032d93F642f64180aa3")]
+    contract: String,
 }
 
 #[tokio::main]
@@ -43,10 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let network_config = NetworkConfig {
         rpc_url: args.rpc_url,
+        contract_address: args.contract,
         ..Default::default()
     };
 
-    let mut miner = Miner::new(network_config, args.threads, args.target_teraflops);
+    let mut miner = Miner::new(network_config, args.threads, args.target_teraflops).await?;
     miner.start_mining().await?;
 
     Ok(())
@@ -54,6 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 struct Miner {
     config: NetworkConfig,
+    rpc_client: DemleRpcClient,
     threads: usize,
     target_teraflops: f64,
     stats: MiningStats,
@@ -61,18 +68,27 @@ struct Miner {
 }
 
 impl Miner {
-    fn new(config: NetworkConfig, threads: usize, target_teraflops: f64) -> Self {
-        Self {
+    async fn new(config: NetworkConfig, threads: usize, target_teraflops: f64) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut rpc_client = DemleRpcClient::new(config.clone());
+        
+        // Initialize the contract
+        rpc_client.init_contract().await
+            .map_err(|e| format!("Failed to initialize contract: {}", e))?;
+        
+        Ok(Self {
             config,
+            rpc_client,
             threads,
             target_teraflops,
             stats: MiningStats::default(),
             start_time: Instant::now(),
-        }
+        })
     }
 
     async fn start_mining(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("⛏️  Starting mining with {} threads", self.threads);
+        info!("📍 Contract Address: {}", self.config.contract_address);
+        info!("🌐 RPC URL: {}", self.config.rpc_url);
 
         let mut nonce = 0u64;
 
@@ -82,14 +98,26 @@ impl Miner {
             match self.mine_work_unit(&work_unit).await {
                 Ok(result) => {
                     self.update_stats(&result);
-                    self.print_stats();
-
-                    if result.total_flops as f64 / 1e12 >= self.target_teraflops {
-                        info!(
-                            "🎯 Target achieved! Found solution with {:.2} TeraFLOPS",
-                            flops_to_teraflops(result.total_flops)
-                        );
+                    
+                    // Submit work to blockchain
+                    match self.rpc_client.submit_work(&result).await {
+                        Ok(tx_hash) => {
+                            info!("✅ Work submitted! TX: {}", tx_hash);
+                            self.stats.tokens_earned += 100; // Assume 100 DEMLE reward
+                            
+                            if result.total_flops as f64 / 1e12 >= self.target_teraflops {
+                                info!(
+                                    "🎯 Target achieved! Found solution with {:.2} TeraFLOPS",
+                                    flops_to_teraflops(result.total_flops)
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            warn!("❌ Failed to submit work: {}", e);
+                        }
                     }
+                    
+                    self.print_stats();
                 }
                 Err(e) => {
                     warn!("Mining error: {}", e);
@@ -97,7 +125,7 @@ impl Miner {
             }
 
             nonce = nonce.wrapping_add(1);
-            sleep(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(5000)).await; // Slow down to 5 seconds between attempts
         }
     }
 

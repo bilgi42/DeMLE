@@ -13,7 +13,8 @@
     "demo": "hardhat run scripts/simple-demo.ts",
     "check-balances": "hardhat run scripts/check-balances.ts",
     "dashboard": "hardhat run scripts/web-dashboard.ts",
-    "live-dashboard": "hardhat run scripts/live-dashboard.ts"
+    "live-dashboard": "hardhat run scripts/live-dashboard.ts",
+    "realtime-demo": "hardhat run scripts/realtime-demo.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

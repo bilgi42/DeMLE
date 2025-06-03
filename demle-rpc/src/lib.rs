@@ -2,49 +2,130 @@ pub mod client;
 pub mod contract;
 
 use demle_core::{DemleError, NetworkConfig, Result};
+use web3::contract::{Contract, Options};
+use web3::types::{Address, Bytes, H256, U256};
+use web3::Web3;
 
 /// RPC client for DEMLE blockchain interactions
 pub struct DemleRpcClient {
     config: NetworkConfig,
-    http_client: reqwest::Client,
+    web3: Web3<web3::transports::Http>,
+    contract: Option<Contract<web3::transports::Http>>,
 }
 
 impl DemleRpcClient {
     pub fn new(config: NetworkConfig) -> Self {
+        let transport = web3::transports::Http::new(&config.rpc_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+        
         Self {
             config,
-            http_client: reqwest::Client::new(),
+            web3,
+            contract: None,
         }
+    }
+    
+    /// Initialize the contract instance
+    pub async fn init_contract(&mut self) -> Result<()> {
+        // Simple DEMLE contract ABI (just the submitMiningProof function)
+        let abi = r#"[
+            {
+                "inputs": [
+                    {"internalType": "bytes32", "name": "nonce", "type": "bytes32"},
+                    {"internalType": "bytes", "name": "mlProof", "type": "bytes"}
+                ],
+                "name": "submitMiningProof",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ]"#;
+        
+        let contract_address: Address = self.config.contract_address.parse()
+            .map_err(|e| DemleError::ValidationError(format!("Invalid contract address: {}", e)))?;
+            
+        let contract = Contract::from_json(
+            self.web3.eth(),
+            contract_address,
+            abi.as_bytes(),
+        ).map_err(|e| DemleError::NetworkError(format!("Failed to load contract: {}", e)))?;
+        
+        self.contract = Some(contract);
+        Ok(())
     }
 
     /// Get current block number
     pub async fn get_block_number(&self) -> Result<u64> {
-        // Placeholder implementation
-        Ok(12345)
+        let block_number = self.web3.eth().block_number().await
+            .map_err(|e| DemleError::NetworkError(format!("Failed to get block number: {}", e)))?;
+        Ok(block_number.as_u64())
     }
 
     /// Get current difficulty
     pub async fn get_difficulty(&self) -> Result<u64> {
-        // Placeholder implementation
+        // For now, return default difficulty
         Ok(self.config.initial_difficulty)
     }
 
     /// Submit work result to blockchain
     pub async fn submit_work(&self, work_result: &demle_core::WorkResult) -> Result<String> {
+        let contract = self.contract.as_ref()
+            .ok_or_else(|| DemleError::NetworkError("Contract not initialized".to_string()))?;
+            
         tracing::info!(
             "Submitting work: {} with {} FLOPS",
             work_result.work_id,
             work_result.total_flops
         );
 
-        // Placeholder: return transaction hash
-        Ok(format!("0x{:x}", md5::compute(&work_result.hash)))
+        // Create nonce from work nonce
+        let nonce_bytes = work_result.nonce.to_be_bytes();
+        let mut nonce_array = [0u8; 32];
+        nonce_array[24..].copy_from_slice(&nonce_bytes);
+        let nonce = H256::from(nonce_array);
+        
+        // Create ML proof from work result
+        let ml_proof = serde_json::to_vec(work_result)
+            .map_err(|e| DemleError::SerializationError(format!("Failed to serialize proof: {}", e)))?;
+        
+        // Get accounts (use first account as default)
+        let accounts = self.web3.eth().accounts().await
+            .map_err(|e| DemleError::NetworkError(format!("Failed to get accounts: {}", e)))?;
+            
+        let from_account = accounts.first()
+            .ok_or_else(|| DemleError::NetworkError("No accounts available".to_string()))?;
+
+        // Submit the transaction
+        let tx_hash = contract
+            .call("submitMiningProof", (nonce, Bytes::from(ml_proof)), *from_account, Options::default())
+            .await
+            .map_err(|e| DemleError::NetworkError(format!("Failed to submit transaction: {}", e)))?;
+
+        Ok(format!("{:?}", tx_hash))
     }
 
     /// Get token balance for an address
     pub async fn get_balance(&self, address: &str) -> Result<u64> {
-        // Placeholder implementation
-        Ok(1000)
+        let contract = self.contract.as_ref()
+            .ok_or_else(|| DemleError::NetworkError("Contract not initialized".to_string()))?;
+            
+        let addr: Address = address.parse()
+            .map_err(|e| DemleError::ValidationError(format!("Invalid address: {}", e)))?;
+            
+        let balance: U256 = contract
+            .query("balanceOf", (addr,), None, Options::default(), None)
+            .await
+            .map_err(|e| DemleError::NetworkError(format!("Failed to get balance: {}", e)))?;
+            
+        // Convert from Wei to DEMLE (assuming 18 decimals)
+        Ok((balance / U256::from(10).pow(18.into())).as_u64())
     }
 }
 

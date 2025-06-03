@@ -1,0 +1,562 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMLE Real-time Token Distribution</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+        .header h1 {
+            margin: 0;
+            color: #667eea;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        .live-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #28a745;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            opacity: 0.9;
+        }
+        .stat-card .value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .miners-section {
+            margin: 40px 0;
+        }
+        .miners-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .miner-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .miner-card.new-activity {
+            border-color: #28a745;
+            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
+            animation: highlight 1s ease;
+        }
+        @keyframes highlight {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .miner-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .miner-avatar {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+        .miner-balance {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+        }
+        .miner-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .miner-stat {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .instructions {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .address {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            word-break: break-all;
+            cursor: pointer;
+        }
+        .address:hover {
+            background: #e9ecef;
+        }
+        .events-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        .events-log {
+            max-height: 400px;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .event-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+        }
+        .event-item.new {
+            background: #d4edda;
+            border-left-color: #155724;
+            animation: slideIn 0.5s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .no-miners {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .chart-container {
+            margin: 40px 0;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 DEMLE Live Dashboard <span class="live-indicator"></span></h1>
+            <p>Real-time Token Distribution Monitoring</p>
+            <div id="status" class="status connected">🟢 Monitoring Active</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Supply</h3>
+                <div class="value" id="totalSupply">0</div>
+                <p>DEMLE Tokens</p>
+            </div>
+            <div class="stat-card">
+                <h3>Active Miners</h3>
+                <div class="value" id="activeMiners">0</div>
+                <p>Detected</p>
+            </div>
+            <div class="stat-card">
+                <h3>Mining Reward</h3>
+                <div class="value" id="miningReward">100</div>
+                <p>DEMLE per Proof</p>
+            </div>
+            <div class="stat-card">
+                <h3>Last Update</h3>
+                <div class="value" id="lastUpdate">--:--</div>
+                <p>Time</p>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>🔗 Connect Your Miner</h3>
+            <p><strong>Contract Address:</strong></p>
+            <div class="address" onclick="copyToClipboard('0x5FbDB2315678afecb367f032d93F642f64180aa3')">0x5FbDB2315678afecb367f032d93F642f64180aa3</div>
+            <p><strong>Network:</strong> Hardhat Local (localhost:8545, Chain ID: 31337)</p>
+            <p><strong>Command to run your Rust miner:</strong></p>
+            <pre>cargo run --bin demle-miner -- --contract 0x5FbDB2315678afecb367f032d93F642f64180aa3 --rpc http://localhost:8545</pre>
+            <p><em>💡 Click the contract address to copy it!</em></p>
+        </div>
+
+        <div class="miners-section">
+            <h2>👥 Detected Miners (<span id="minerCount">0</span>)</h2>
+            <div class="miners-grid" id="minersGrid">
+                <div class="no-miners">
+                    Waiting for miners... Start your miner to see it appear here!<br>
+                    <small>Dashboard updates every 3 seconds</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container" id="chartContainer">
+            <h3>📊 Token Distribution Chart</h3>
+            <canvas id="tokenChart" width="400" height="200"></canvas>
+        </div>
+
+        <div class="events-section">
+            <h3>⛏️ Recent Mining Events</h3>
+            <div class="events-log" id="eventsLog">
+                <div class="no-miners">No mining events yet...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Contract configuration
+        const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+        const RPC_URL = 'http://localhost:8545';
+        
+        // Contract ABI - just the parts we need
+        const ABI = [
+            "function balanceOf(address) view returns (uint256)",
+            "function totalSupply() view returns (uint256)",
+            "function MINING_REWARD() view returns (uint256)",
+            "function MAX_SUPPLY() view returns (uint256)",
+            "function getMiningDifficulty() view returns (uint256)",
+            "event MiningReward(address indexed miner, uint256 amount, bytes32 nonce)"
+        ];
+
+        let provider;
+        let contract;
+        let chart = null;
+        let knownMiners = new Map();
+        let lastBlockScanned = 0;
+        let eventHistory = [];
+
+        // Initialize connection
+        async function init() {
+            try {
+                provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+                contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+                
+                // Get current block to start monitoring from
+                lastBlockScanned = await provider.getBlockNumber();
+                console.log('Connected to blockchain, monitoring from block:', lastBlockScanned);
+                
+                // Start monitoring
+                startMonitoring();
+                
+                document.getElementById('status').innerHTML = '🟢 Connected & Monitoring';
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').innerHTML = '🔴 Connection Failed';
+            }
+        }
+
+        // Monitor for new events and update dashboard
+        async function startMonitoring() {
+            setInterval(async () => {
+                try {
+                    await checkForUpdates();
+                    await updateDashboard();
+                    
+                    // Update last update time
+                    document.getElementById('lastUpdate').textContent = 
+                        new Date().toLocaleTimeString();
+                        
+                } catch (error) {
+                    console.error('Update error:', error);
+                }
+            }, 3000); // Check every 3 seconds
+        }
+
+        // Check for new mining events
+        async function checkForUpdates() {
+            const currentBlock = await provider.getBlockNumber();
+            
+            if (currentBlock > lastBlockScanned) {
+                // Query for MiningReward events
+                const filter = contract.filters.MiningReward();
+                const events = await contract.queryFilter(filter, lastBlockScanned + 1, currentBlock);
+                
+                for (const event of events) {
+                    const { miner, amount, nonce } = event.args;
+                    const block = await event.getBlock();
+                    
+                    // Update or add miner
+                    if (!knownMiners.has(miner)) {
+                        knownMiners.set(miner, {
+                            address: miner,
+                            balance: ethers.BigNumber.from(0),
+                            totalMines: 0,
+                            lastMining: block.timestamp,
+                            name: `Miner ${knownMiners.size + 1}`
+                        });
+                    }
+                    
+                    const minerData = knownMiners.get(miner);
+                    minerData.totalMines++;
+                    minerData.lastMining = block.timestamp;
+                    
+                    // Add to event history
+                    eventHistory.unshift({
+                        id: `${event.transactionHash}-${event.logIndex}`,
+                        miner,
+                        amount: ethers.utils.formatEther(amount),
+                        timestamp: block.timestamp,
+                        blockNumber: event.blockNumber,
+                        isNew: true
+                    });
+                    
+                    // Keep only last 50 events
+                    if (eventHistory.length > 50) {
+                        eventHistory = eventHistory.slice(0, 50);
+                    }
+                    
+                    console.log(`New mining event: ${miner} earned ${ethers.utils.formatEther(amount)} DEMLE`);
+                    
+                    // Highlight the miner card temporarily
+                    setTimeout(() => {
+                        const minerCard = document.getElementById(`miner-${miner}`);
+                        if (minerCard) {
+                            minerCard.classList.add('new-activity');
+                            setTimeout(() => minerCard.classList.remove('new-activity'), 2000);
+                        }
+                    }, 100);
+                }
+                
+                lastBlockScanned = currentBlock;
+            }
+        }
+
+        // Update dashboard with current state
+        async function updateDashboard() {
+            try {
+                // Update balances for all known miners
+                for (const [address, minerData] of knownMiners) {
+                    minerData.balance = await contract.balanceOf(address);
+                }
+                
+                // Get contract stats
+                const totalSupply = await contract.totalSupply();
+                const miningReward = await contract.MINING_REWARD();
+                
+                // Update UI
+                document.getElementById('totalSupply').textContent = 
+                    ethers.utils.formatEther(totalSupply);
+                document.getElementById('miningReward').textContent = 
+                    ethers.utils.formatEther(miningReward);
+                document.getElementById('activeMiners').textContent = knownMiners.size;
+                document.getElementById('minerCount').textContent = knownMiners.size;
+                
+                // Update miners display
+                updateMinersDisplay();
+                
+                // Update chart
+                updateChart();
+                
+                // Update events
+                updateEvents();
+                
+            } catch (error) {
+                console.error('Dashboard update error:', error);
+            }
+        }
+
+        function updateMinersDisplay() {
+            const minersGrid = document.getElementById('minersGrid');
+            
+            if (knownMiners.size === 0) {
+                minersGrid.innerHTML = `
+                    <div class="no-miners">
+                        Waiting for miners... Start your miner to see it appear here!<br>
+                        <small>Dashboard updates every 3 seconds</small>
+                    </div>
+                `;
+                return;
+            }
+            
+            const miners = Array.from(knownMiners.values());
+            minersGrid.innerHTML = miners.map((miner, index) => `
+                <div class="miner-card" id="miner-${miner.address}">
+                    <div class="miner-header">
+                        <div class="miner-avatar">${getMinerAvatar(index)}</div>
+                        <div class="miner-info">
+                            <h4>${miner.name}</h4>
+                            <small>${miner.address.slice(0, 8)}...${miner.address.slice(-6)}</small>
+                        </div>
+                    </div>
+                    <div class="miner-balance">${ethers.utils.formatEther(miner.balance)} DEMLE</div>
+                    <div class="miner-stats">
+                        <div class="miner-stat">
+                            <strong>${miner.totalMines}</strong><br>
+                            <small>Total Mines</small>
+                        </div>
+                        <div class="miner-stat">
+                            <strong>${new Date(miner.lastMining * 1000).toLocaleTimeString()}</strong><br>
+                            <small>Last Mining</small>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateChart() {
+            if (knownMiners.size === 0) {
+                document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('chartContainer').style.display = 'block';
+            
+            const ctx = document.getElementById('tokenChart').getContext('2d');
+            const miners = Array.from(knownMiners.values());
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: miners.map(m => m.name),
+                    datasets: [{
+                        label: 'DEMLE Holdings',
+                        data: miners.map(m => parseFloat(ethers.utils.formatEther(m.balance))),
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 205, 86, 0.8)',
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)',
+                            'rgba(255, 159, 64, 0.8)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        title: {
+                            display: true,
+                            text: 'Live Token Distribution'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateEvents() {
+            const eventsLog = document.getElementById('eventsLog');
+            
+            if (eventHistory.length === 0) {
+                eventsLog.innerHTML = '<div class="no-miners">No mining events yet...</div>';
+                return;
+            }
+            
+            eventsLog.innerHTML = eventHistory.slice(0, 10).map(event => `
+                <div class="event-item ${event.isNew ? 'new' : ''}">
+                    <strong>⛏️ Mining Success!</strong><br>
+                    <small>Miner: ${event.miner.slice(0, 8)}...${event.miner.slice(-6)}</small><br>
+                    <small>💰 Earned: ${event.amount} DEMLE</small><br>
+                    <small>🕒 Time: ${new Date(event.timestamp * 1000).toLocaleString()}</small><br>
+                    <small>📦 Block: ${event.blockNumber}</small>
+                </div>
+            `).join('');
+            
+            // Mark events as no longer new after they've been displayed
+            eventHistory.forEach(event => event.isNew = false);
+        }
+
+        function getMinerAvatar(index) {
+            const avatars = ['👩‍💻', '👨‍🔬', '🧑‍💼', '👩‍🚀', '👨‍💻', '🧑‍🔬'];
+            return avatars[index % avatars.length];
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Contract address copied to clipboard! 📋');
+            }).catch(() => {
+                // Fallback for older browsers
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                alert('Contract address copied to clipboard! 📋');
+            });
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', init);
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (chart) chart.destroy();
+        });
+    </script>
+</body>
+</html>
