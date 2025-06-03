@@ -5,7 +5,7 @@ edition = "2021"
 description = "FP8 machine learning operations for DEMLE mining"
 
 [dependencies]
-demle-core = { path = "../demle-core" }
+demle-core = { path = "../demle-core", features = [] }
 nalgebra = { workspace = true }
 half = { workspace = true }
 rayon = { workspace = true }
@@ -27,4 +27,4 @@ proptest = { workspace = true }
 [features]
 default = []
 gpu = ["candle-core", "candle-nn", "wgpu"]
-cuda = ["candle-core", "candle-nn"] 
+cuda = ["candle-core", "candle-nn", "demle-core/cuda"] 

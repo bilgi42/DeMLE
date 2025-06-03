@@ -1021,6 +1021,7 @@ name = "demle-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "candle-core",
  "hex",
  "proptest",
  "rand 0.9.1",
@@ -1037,6 +1038,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "candle-core",
+ "candle-nn",
  "criterion",
  "demle-core",
  "half",

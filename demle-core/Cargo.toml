@@ -16,5 +16,12 @@ thiserror = "1.0"
 sha3 = "0.10"
 hex = "0.4"
 
+# Optional CUDA support
+candle-core = { version = "0.9", optional = true }
+
+[features]
+default = []
+cuda = ["candle-core"]
+
 [dev-dependencies]
 proptest = { workspace = true } 

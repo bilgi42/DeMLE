@@ -133,5 +133,13 @@ pub enum DemleError {
     SerializationError(String),
 }
 
+// Add From implementations for common error types
+#[cfg(feature = "cuda")]
+impl From<candle_core::Error> for DemleError {
+    fn from(err: candle_core::Error) -> Self {
+        DemleError::ComputationError(format!("Candle error: {}", err))
+    }
+}
+
 /// Result type for DEMLE operations
 pub type Result<T> = std::result::Result<T, DemleError>;
