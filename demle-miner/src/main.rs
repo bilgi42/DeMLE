@@ -1,10 +1,10 @@
 use clap::Parser;
 use demle_core::{types::MiningStats, MLOperation, NetworkConfig, WorkUnit};
-use demle_fp8::{calculate_total_flops, execute_ml_operation, flops_to_teraflops};
+use demle_fp8::{execute_ml_operation, flops_to_teraflops};
 use demle_rpc::DemleRpcClient;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 #[derive(Parser)]
 #[command(name = "demle-miner")]
