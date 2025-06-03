@@ -10,6 +10,7 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 rand = { workspace = true }
+thiserror = "1.0"
 
 # Cryptography
 sha3 = "0.10"
