@@ -1,6 +1,6 @@
-pub mod types;
-pub mod proof;
 pub mod difficulty;
+pub mod proof;
+pub mod types;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -63,16 +63,26 @@ impl fmt::Display for MLOperation {
         match self {
             MLOperation::MatrixMultiply { dimensions, .. } => {
                 write!(f, "GEMM {}x{}x{}", dimensions.0, dimensions.1, dimensions.2)
-            },
+            }
             MLOperation::Convolution2D { kernel_shape, .. } => {
-                write!(f, "Conv2D {}x{}x{}x{}", kernel_shape.0, kernel_shape.1, kernel_shape.2, kernel_shape.3)
-            },
-            MLOperation::MultiHeadAttention { num_heads, d_model, .. } => {
+                write!(
+                    f,
+                    "Conv2D {}x{}x{}x{}",
+                    kernel_shape.0, kernel_shape.1, kernel_shape.2, kernel_shape.3
+                )
+            }
+            MLOperation::MultiHeadAttention {
+                num_heads, d_model, ..
+            } => {
                 write!(f, "Attention {}heads x {}", num_heads, d_model)
-            },
+            }
             MLOperation::BatchNormalization { shape, .. } => {
-                write!(f, "BatchNorm {}x{}x{}x{}", shape.0, shape.1, shape.2, shape.3)
-            },
+                write!(
+                    f,
+                    "BatchNorm {}x{}x{}x{}",
+                    shape.0, shape.1, shape.2, shape.3
+                )
+            }
         }
     }
 }
@@ -112,16 +122,16 @@ pub struct WorkResult {
 pub enum DemleError {
     #[error("Computation error: {0}")]
     ComputationError(String),
-    
+
     #[error("Network error: {0}")]
     NetworkError(String),
-    
+
     #[error("Validation error: {0}")]
     ValidationError(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 }
 
 /// Result type for DEMLE operations
-pub type Result<T> = std::result::Result<T, DemleError>; 
+pub type Result<T> = std::result::Result<T, DemleError>;

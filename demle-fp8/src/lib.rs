@@ -1,9 +1,9 @@
-pub mod fp8;
-pub mod operations;
-pub mod gemm;
-pub mod convolution;
 pub mod attention;
 pub mod batch_norm;
+pub mod convolution;
+pub mod fp8;
+pub mod gemm;
+pub mod operations;
 
 use demle_core::{MLOperation, OperationResult, Result};
 use std::time::Instant;
@@ -13,40 +13,32 @@ pub use fp8::FP8;
 /// Execute a machine learning operation and return timing and result information
 pub fn execute_ml_operation(operation: &MLOperation) -> Result<OperationResult> {
     let start = Instant::now();
-    
+
     let (result_hash, flops) = match operation {
-        MLOperation::MatrixMultiply { dimensions, seed } => {
-            gemm::execute_gemm(*dimensions, *seed)?
-        }
-        MLOperation::Convolution2D { 
-            input_shape, 
-            kernel_shape, 
-            stride, 
-            padding, 
-            seed 
-        } => {
-            convolution::execute_conv2d(*input_shape, *kernel_shape, *stride, *padding, *seed)?
-        }
+        MLOperation::MatrixMultiply { dimensions, seed } => gemm::execute_gemm(*dimensions, *seed)?,
+        MLOperation::Convolution2D {
+            input_shape,
+            kernel_shape,
+            stride,
+            padding,
+            seed,
+        } => convolution::execute_conv2d(*input_shape, *kernel_shape, *stride, *padding, *seed)?,
         MLOperation::MultiHeadAttention {
             batch_size,
             seq_length,
             d_model,
             num_heads,
             seed,
-        } => {
-            attention::execute_attention(*batch_size, *seq_length, *d_model, *num_heads, *seed)?
-        }
+        } => attention::execute_attention(*batch_size, *seq_length, *d_model, *num_heads, *seed)?,
         MLOperation::BatchNormalization {
             shape,
             epsilon,
             seed,
-        } => {
-            batch_norm::execute_batch_norm(*shape, *epsilon, *seed)?
-        }
+        } => batch_norm::execute_batch_norm(*shape, *epsilon, *seed)?,
     };
-    
+
     let execution_time_ms = start.elapsed().as_millis() as u64;
-    
+
     Ok(OperationResult {
         result_hash,
         flops,
@@ -56,10 +48,7 @@ pub fn execute_ml_operation(operation: &MLOperation) -> Result<OperationResult> 
 
 /// Execute a complete work unit (sequence of ML operations)
 pub fn execute_work_unit(operations: &[MLOperation]) -> Result<Vec<OperationResult>> {
-    operations
-        .iter()
-        .map(execute_ml_operation)
-        .collect()
+    operations.iter().map(execute_ml_operation).collect()
 }
 
 /// Calculate total FLOPS from a list of operation results
@@ -96,7 +85,7 @@ mod tests {
         let teraflops = 2.5;
         let flops = teraflops_to_flops(teraflops);
         let converted_back = flops_to_teraflops(flops);
-        
+
         assert!((converted_back - teraflops).abs() < 0.001);
     }
 
@@ -106,10 +95,10 @@ mod tests {
             dimensions: (32, 32, 32),
             seed: 42,
         };
-        
+
         let result = execute_ml_operation(&operation);
         assert!(result.is_ok());
-        
+
         let result = result.unwrap();
         assert!(result.flops > 0);
         assert!(!result.result_hash.is_empty());
@@ -128,11 +117,11 @@ mod tests {
                 seed: 2,
             },
         ];
-        
+
         let results = execute_work_unit(&operations).unwrap();
         assert_eq!(results.len(), 2);
-        
+
         let total_flops = calculate_total_flops(&results);
         assert!(total_flops > 0);
     }
-} 
+}

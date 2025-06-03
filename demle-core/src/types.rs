@@ -15,12 +15,12 @@ pub type Difficulty = u64;
 /// Mining stats for tracking performance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MiningStats {
-    pub hashrate: f64,           // Hashes per second
-    pub teraflops: f64,          // Teraflops per second
-    pub blocks_found: u64,       // Total blocks found
-    pub total_operations: u64,   // Total ML operations performed
-    pub uptime_seconds: u64,     // Miner uptime
-    pub tokens_earned: u64,      // Total DEMLE tokens earned
+    pub hashrate: f64,         // Hashes per second
+    pub teraflops: f64,        // Teraflops per second
+    pub blocks_found: u64,     // Total blocks found
+    pub total_operations: u64, // Total ML operations performed
+    pub uptime_seconds: u64,   // Miner uptime
+    pub tokens_earned: u64,    // Total DEMLE tokens earned
 }
 
 impl Default for MiningStats {
@@ -34,4 +34,4 @@ impl Default for MiningStats {
             tokens_earned: 0,
         }
     }
-} 
+}

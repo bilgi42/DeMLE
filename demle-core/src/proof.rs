@@ -1,6 +1,6 @@
+use crate::{DemleError, Result};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
-use crate::{Result, DemleError};
 
 /// Proof of work for ML computation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ impl Proof {
     ) -> Self {
         let combined = format!("{}:{}:{}", nonce, operation_hashes.join(","), total_flops);
         let work_hash = hex::encode(Sha3_256::digest(combined.as_bytes()));
-        
+
         Self {
             nonce,
             work_hash,
@@ -31,23 +31,20 @@ impl Proof {
             timestamp,
         }
     }
-    
+
     /// Verify that this proof meets the difficulty requirement
     pub fn verify(&self, difficulty: u64) -> Result<bool> {
         // Simple difficulty check: hash must start with certain number of zeros
-        let leading_zeros = self.work_hash
-            .chars()
-            .take_while(|&c| c == '0')
-            .count();
-            
+        let leading_zeros = self.work_hash.chars().take_while(|&c| c == '0').count();
+
         // Convert difficulty to required leading zeros (simplified)
         let required_zeros = (difficulty as f64).log10() as usize;
-        
+
         Ok(leading_zeros >= required_zeros)
     }
-    
+
     /// Calculate the hash of intermediate computation results
     pub fn hash_operation_result(data: &[u8]) -> String {
         hex::encode(Sha3_256::digest(data))
     }
-} 
+}

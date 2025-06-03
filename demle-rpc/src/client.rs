@@ -1,1 +1,1 @@
-// Placeholder for additional client functionality 
+// Placeholder for additional client functionality

@@ -1,1 +1,1 @@
-// Placeholder for smart contract interaction functionality 
+// Placeholder for smart contract interaction functionality
