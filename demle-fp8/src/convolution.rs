@@ -5,7 +5,7 @@ use demle_core::{proof::Proof, DemleError, Result};
 #[cfg(feature = "cuda")]
 use candle_core::{Device, Tensor};
 #[cfg(feature = "cuda")]
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 #[cfg(feature = "cuda")]
 use rand_distr::{Distribution, Normal};
 
@@ -72,7 +72,7 @@ fn execute_conv2d_gpu(
     })?;
 
     // Perform GPU convolution using Candle's conv2d
-    let output_tensor = input_tensor.conv2d(&kernel_tensor, ph, pw, sh, sw, 1, 1).map_err(|e| {
+    let output_tensor = input_tensor.conv2d(&kernel_tensor, ph, pw, sh, sw).map_err(|e| {
         DemleError::ComputationError(format!("GPU Conv2D failed: {}", e))
     })?;
 

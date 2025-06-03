@@ -1,6 +1,6 @@
 use crate::fp8::FP8;
 use crate::operations::generate_random_tensor;
-use demle_core::{proof::Proof, DemleError, Result};
+use demle_core::{proof::Proof, Result};
 
 /// Execute batch normalization operation
 pub fn execute_batch_norm(

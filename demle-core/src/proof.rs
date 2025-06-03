@@ -1,4 +1,4 @@
-use crate::{DemleError, Result};
+use crate::Result;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 

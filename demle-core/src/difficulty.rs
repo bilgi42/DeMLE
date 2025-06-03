@@ -1,5 +1,3 @@
-use crate::{NetworkConfig, Result};
-
 /// Calculate new difficulty based on block times
 pub fn adjust_difficulty(
     current_difficulty: u64,

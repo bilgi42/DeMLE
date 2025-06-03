@@ -1,6 +1,6 @@
 use crate::fp8::FP8;
 use crate::operations::{generate_random_tensor, softmax};
-use demle_core::{proof::Proof, DemleError, Result};
+use demle_core::{proof::Proof, Result};
 
 /// Execute multi-head attention operation
 pub fn execute_attention(

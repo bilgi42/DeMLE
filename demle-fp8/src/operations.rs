@@ -1,6 +1,6 @@
 use crate::fp8::FP8;
 use demle_core::{DemleError, Result};
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_distr::{Distribution, Normal};
 
 /// Generate random FP8 tensor with given shape and seed

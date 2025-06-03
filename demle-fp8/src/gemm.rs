@@ -1,16 +1,16 @@
 use crate::fp8::FP8;
 use demle_core::{proof::Proof, DemleError, Result};
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
 
 #[cfg(feature = "cuda")]
-use candle_core::{Device, Tensor, DType};
+use candle_core::{Device, Tensor};
 
 /// Execute FP8 GEMM operation: C = A * B
 /// Uses GPU acceleration when available
 pub fn execute_gemm(dimensions: (usize, usize, usize), seed: u64) -> Result<(String, u64)> {
-    let (m, k, n) = dimensions;
+    let (_m, _k, _n) = dimensions;
 
     #[cfg(feature = "cuda")]
     {
