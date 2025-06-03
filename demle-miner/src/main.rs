@@ -10,7 +10,7 @@ use tracing::{info, warn, error};
 #[command(about = "DEMLE FP8 ML cryptocurrency miner")]
 struct Args {
     /// Number of mining threads
-    #[arg(short, long, default_value = "4")]
+    #[arg(short = 'j', long, default_value = "4")]
     threads: usize,
     
     /// Mining target in teraflops
