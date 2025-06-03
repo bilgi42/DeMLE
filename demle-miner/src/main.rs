@@ -2,8 +2,7 @@ use clap::Parser;
 use demle_core::{types::MiningStats, MLOperation, NetworkConfig, WorkUnit};
 use demle_fp8::{execute_ml_operation, flops_to_teraflops};
 use demle_rpc::DemleRpcClient;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::time::sleep;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
 #[cfg(feature = "cuda")]
@@ -232,8 +231,8 @@ impl Miner {
                 let handle = thread::spawn(move || {
                     info!("🔄 Executing operation {} on GPU stream: {}", i + 1, op);
                     let result = execute_ml_operation(&op);
-                    if let Ok(op_result) = result {
-                        results.lock().unwrap().push(op_result);
+                    if let Ok(ref op_result) = result {
+                        results.lock().unwrap().push(op_result.clone());
                     }
                     result
                 });
