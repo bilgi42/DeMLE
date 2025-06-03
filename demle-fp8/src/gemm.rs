@@ -62,11 +62,11 @@ fn execute_gemm_gpu(dimensions: (usize, usize, usize), seed: u64) -> Result<(Str
         DemleError::ComputationError(format!("Failed to convert B to BF16: {}", e))
     })?;
 
-    // Perform optimal number of operations for H100 memory management
+    // Perform massive batch operations for H100 tensor core saturation
     let mut total_flops = 0u64;
     let mut all_results = Vec::new();
     
-    for batch in 0..8 { // Reduced from 16 to 8 for better memory management
+    for batch in 0..32 { // Increased to 32 for massive H100 utilization
         let c_tensor = a_tensor.matmul(&b_tensor).map_err(|e| {
             DemleError::ComputationError(format!("GPU GEMM batch {} failed: {}", batch, e))
         })?;

@@ -13,7 +13,7 @@ use candle_core;
 #[command(about = "DEMLE FP8 ML cryptocurrency miner")]
 struct Args {
     /// Number of mining threads
-    #[arg(short = 'j', long, default_value = "64")]
+    #[arg(short = 'j', long, default_value = "4")]
     threads: usize,
 
     /// Mining target in teraflops
@@ -155,58 +155,28 @@ impl Miner {
     async fn generate_work_unit(&self, nonce: u64) -> Result<WorkUnit, Box<dyn std::error::Error>> {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        // H100-optimized ML operations - balanced for 80GB memory
+        // H100 Tensor Core Optimized: Fewer but MASSIVE operations
         let operations = vec![
-            // Large but memory-efficient GEMM operations for H100 tensor cores
+            // Massive GEMM for maximum tensor core utilization
             MLOperation::MatrixMultiply {
-                dimensions: (6144, 6144, 6144), // ~450 GFLOPS per operation, ~9GB memory
+                dimensions: (16384, 16384, 8192), // ~4.3 TB FLOPS single operation!
                 seed: nonce,
             },
-            MLOperation::MatrixMultiply {
-                dimensions: (8192, 4096, 4096), // Mixed dimensions, ~270 GFLOPS, ~5GB memory
+            // Large transformer-style attention (common H100 workload)
+            MLOperation::MultiHeadAttention {
+                batch_size: 128,
+                seq_length: 2048, // Very long sequences
+                d_model: 8192, // Massive model
+                num_heads: 128,
                 seed: nonce.wrapping_add(1),
             },
-            MLOperation::MatrixMultiply {
-                dimensions: (4096, 8192, 4096), // Different shape, ~270 GFLOPS, ~5GB memory
-                seed: nonce.wrapping_add(2),
-            },
-            // Large convolution for image processing workloads
+            // Large convolution for vision workloads
             MLOperation::Convolution2D {
-                input_shape: (32, 1024, 128, 128), // Large but manageable batch and feature maps
-                kernel_shape: (2048, 1024, 3, 3),
+                input_shape: (256, 3072, 224, 224), // Huge batch of high-res images
+                kernel_shape: (8192, 3072, 3, 3), // Massive feature extraction
                 stride: (1, 1),
                 padding: (1, 1),
-                seed: nonce.wrapping_add(3),
-            },
-            // Large transformer attention
-            MLOperation::MultiHeadAttention {
-                batch_size: 32,
-                seq_length: 512, // Long sequences
-                d_model: 2048, // Large model
-                num_heads: 32,
-                seed: nonce.wrapping_add(4),
-            },
-            MLOperation::MultiHeadAttention {
-                batch_size: 64,
-                seq_length: 256,
-                d_model: 4096, // Very large model
-                num_heads: 64,
-                seed: nonce.wrapping_add(5),
-            },
-            // Large batch normalization
-            MLOperation::BatchNormalization {
-                shape: (64, 2048, 128, 128), // Large tensors but memory-efficient
-                epsilon: 1e-5,
-                seed: nonce.wrapping_add(6),
-            },
-            // Additional memory-optimized GEMM operations
-            MLOperation::MatrixMultiply {
-                dimensions: (12288, 4096, 3072), // Asymmetric for variety, ~300 GFLOPS
-                seed: nonce.wrapping_add(7),
-            },
-            MLOperation::MatrixMultiply {
-                dimensions: (8192, 6144, 4096), // High compute density, ~400 GFLOPS
-                seed: nonce.wrapping_add(8),
+                seed: nonce.wrapping_add(2),
             },
         ];
 
@@ -229,39 +199,25 @@ impl Miner {
         info!("⚡ Mining work unit: {}", work_unit.id);
         info!("📋 Operations: {}", work_unit.operations.len());
 
-        // For H100 optimization: Execute operations in true GPU parallel streams
-        // instead of tokio async which adds CPU overhead
+        // H100 Optimized: Sequential execution of massive operations
+        // Parallel threads for GPU are counterproductive due to CUDA context overhead
         #[cfg(feature = "cuda")]
         {
-            use std::sync::{Arc, Mutex};
-            use std::thread;
-            
-            let operation_results = Arc::new(Mutex::new(Vec::new()));
-            let mut handles = Vec::new();
+            let mut operation_results = Vec::new();
+            let mut total_flops = 0u64;
 
-            // Split operations into chunks for parallel GPU streams
+            // Execute each massive operation sequentially for maximum GPU utilization
             for (i, operation) in work_unit.operations.iter().enumerate() {
-                let op = operation.clone();
-                let results = Arc::clone(&operation_results);
+                info!("🔄 Executing MASSIVE operation {} on H100: {}", i + 1, operation);
                 
-                let handle = thread::spawn(move || {
-                    info!("🔄 Executing operation {} on GPU stream: {}", i + 1, op);
-                    let result = execute_ml_operation(&op);
-                    if let Ok(ref op_result) = result {
-                        results.lock().unwrap().push(op_result.clone());
-                    }
-                    result
-                });
-                handles.push(handle);
+                let result = execute_ml_operation(operation)?;
+                total_flops += result.flops;
+                operation_results.push(result);
+                
+                // Log progress for massive operations
+                info!("✅ Completed operation {} - {:.2} TFLOPS accumulated", 
+                      i + 1, total_flops as f64 / 1e12);
             }
-
-            // Wait for all GPU operations to complete
-            for handle in handles {
-                handle.join().unwrap()?;
-            }
-
-            let operation_results = Arc::try_unwrap(operation_results).unwrap().into_inner().unwrap();
-            let total_flops: u64 = operation_results.iter().map(|r| r.flops).sum();
             
             let execution_time_ms = start.elapsed().as_millis() as u64;
 

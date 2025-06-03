@@ -73,12 +73,11 @@ fn execute_attention_gpu(
     let v_heads = v.reshape((batch_size, seq_length, num_heads, d_k))?
         .transpose(1, 2)?;
 
-    // Multiple attention iterations for higher FLOPS
+    // Maximum attention iterations for H100 tensor core saturation
     let mut total_flops = 0u64;
     let mut final_output = None;
 
-    // Optimal attention iterations for H100 memory efficiency
-    for iteration in 0..10 { // Reduced from 20 to 10 for memory balance
+    for iteration in 0..25 { // Increased to 25 for maximum H100 utilization
         // Compute attention scores (Q @ K^T)
         let q_reshaped = q_heads.reshape((batch_size * num_heads, seq_length, d_k))?;
         let k_reshaped = k_heads.reshape((batch_size * num_heads, seq_length, d_k))?;
