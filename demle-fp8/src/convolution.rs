@@ -2,10 +2,103 @@ use crate::fp8::FP8;
 use crate::operations::generate_random_tensor;
 use demle_core::{proof::Proof, DemleError, Result};
 
+#[cfg(feature = "cuda")]
+use candle_core::{Device, Tensor};
+#[cfg(feature = "cuda")]
+use rand::{Rng, SeedableRng};
+#[cfg(feature = "cuda")]
+use rand_distr::{Distribution, Normal};
+
 /// Execute 2D convolution operation
+/// Uses GPU acceleration when available
 pub fn execute_conv2d(
     input_shape: (usize, usize, usize, usize), // (batch, channels, height, width)
     kernel_shape: (usize, usize, usize, usize), // (out_channels, in_channels, kh, kw)
+    stride: (usize, usize),
+    padding: (usize, usize),
+    seed: u64,
+) -> Result<(String, u64)> {
+    #[cfg(feature = "cuda")]
+    {
+        // GPU-accelerated version
+        execute_conv2d_gpu(input_shape, kernel_shape, stride, padding, seed)
+    }
+    #[cfg(not(feature = "cuda"))]
+    {
+        // CPU fallback
+        execute_conv2d_cpu(input_shape, kernel_shape, stride, padding, seed)
+    }
+}
+
+#[cfg(feature = "cuda")]
+fn execute_conv2d_gpu(
+    input_shape: (usize, usize, usize, usize),
+    kernel_shape: (usize, usize, usize, usize),
+    stride: (usize, usize),
+    padding: (usize, usize),
+    seed: u64,
+) -> Result<(String, u64)> {
+    let (batch, in_ch, ih, iw) = input_shape;
+    let (out_ch, _, kh, kw) = kernel_shape;
+    let (sh, sw) = stride;
+    let (ph, pw) = padding;
+
+    // Use CUDA device for GPU acceleration
+    let device = Device::new_cuda(0).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create CUDA device: {}", e))
+    })?;
+
+    // Generate random input and kernel data
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+    let normal = Normal::new(0.0, 1.0).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create normal distribution: {}", e))
+    })?;
+
+    let input_data: Vec<f32> = (0..(batch * in_ch * ih * iw))
+        .map(|_| normal.sample(&mut rng) as f32)
+        .collect();
+
+    let kernel_data: Vec<f32> = (0..(out_ch * in_ch * kh * kw))
+        .map(|_| normal.sample(&mut rng) as f32)
+        .collect();
+
+    // Create tensors on GPU
+    let input_tensor = Tensor::from_vec(input_data, (batch, in_ch, ih, iw), &device).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create input tensor: {}", e))
+    })?;
+
+    let kernel_tensor = Tensor::from_vec(kernel_data, (out_ch, in_ch, kh, kw), &device).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create kernel tensor: {}", e))
+    })?;
+
+    // Perform GPU convolution using Candle's conv2d
+    let output_tensor = input_tensor.conv2d(&kernel_tensor, ph, pw, sh, sw, 1, 1).map_err(|e| {
+        DemleError::ComputationError(format!("GPU Conv2D failed: {}", e))
+    })?;
+
+    // Get result back to CPU for hashing
+    let output_data: Vec<f32> = output_tensor.flatten_all().map_err(|e| {
+        DemleError::ComputationError(format!("Failed to flatten output: {}", e))
+    })?.to_vec1().map_err(|e| {
+        DemleError::ComputationError(format!("Failed to get result from GPU: {}", e))
+    })?;
+
+    // Calculate FLOPS
+    let oh = (ih + 2 * ph - kh) / sh + 1;
+    let ow = (iw + 2 * pw - kw) / sw + 1;
+    let flops = 2 * (batch as u64) * (out_ch as u64) * (in_ch as u64) * (kh as u64) * (kw as u64) * (oh as u64) * (ow as u64);
+
+    // Hash the result (convert to FP8 for consistency)
+    let fp8_data: Vec<FP8> = output_data.iter().map(|&f| FP8::from_f32(f)).collect();
+    let result_bytes: Vec<u8> = fp8_data.iter().flat_map(|fp8| vec![fp8.to_bits()]).collect();
+    let result_hash = Proof::hash_operation_result(&result_bytes);
+
+    Ok((result_hash, flops))
+}
+
+fn execute_conv2d_cpu(
+    input_shape: (usize, usize, usize, usize),
+    kernel_shape: (usize, usize, usize, usize),
     stride: (usize, usize),
     padding: (usize, usize),
     seed: u64,

@@ -1,12 +1,84 @@
 use crate::fp8::FP8;
 use demle_core::{proof::Proof, DemleError, Result};
-use nalgebra::DMatrix;
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 use rayon::prelude::*;
 
+#[cfg(feature = "cuda")]
+use candle_core::{Device, Tensor, DType};
+
 /// Execute FP8 GEMM operation: C = A * B
+/// Uses GPU acceleration when available
 pub fn execute_gemm(dimensions: (usize, usize, usize), seed: u64) -> Result<(String, u64)> {
+    let (m, k, n) = dimensions;
+
+    #[cfg(feature = "cuda")]
+    {
+        // GPU-accelerated version
+        execute_gemm_gpu(dimensions, seed)
+    }
+    #[cfg(not(feature = "cuda"))]
+    {
+        // CPU fallback
+        execute_gemm_cpu(dimensions, seed)
+    }
+}
+
+#[cfg(feature = "cuda")]
+fn execute_gemm_gpu(dimensions: (usize, usize, usize), seed: u64) -> Result<(String, u64)> {
+    let (m, k, n) = dimensions;
+    
+    // Use CUDA device for GPU acceleration
+    let device = Device::new_cuda(0).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create CUDA device: {}", e))
+    })?;
+
+    // Generate random matrices using seed for reproducibility
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+    let normal = Normal::new(0.0, 1.0).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create normal distribution: {}", e))
+    })?;
+
+    // Create matrices A(m×k) and B(k×n) on GPU
+    let a_data: Vec<f32> = (0..m * k)
+        .map(|_| normal.sample(&mut rng) as f32)
+        .collect();
+    
+    let b_data: Vec<f32> = (0..k * n)
+        .map(|_| normal.sample(&mut rng) as f32)
+        .collect();
+
+    // Create tensors on GPU
+    let a_tensor = Tensor::from_vec(a_data, (m, k), &device).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create tensor A: {}", e))
+    })?;
+    
+    let b_tensor = Tensor::from_vec(b_data, (k, n), &device).map_err(|e| {
+        DemleError::ComputationError(format!("Failed to create tensor B: {}", e))
+    })?;
+
+    // Perform GPU matrix multiplication
+    let c_tensor = a_tensor.matmul(&b_tensor).map_err(|e| {
+        DemleError::ComputationError(format!("GPU GEMM failed: {}", e))
+    })?;
+
+    // Get result back to CPU for hashing
+    let c_data: Vec<f32> = c_tensor.to_vec2().map_err(|e| {
+        DemleError::ComputationError(format!("Failed to get result from GPU: {}", e))
+    })?.into_iter().flatten().collect();
+
+    // Calculate FLOPS (2 * m * k * n for GEMM)
+    let flops = 2 * (m as u64) * (k as u64) * (n as u64);
+
+    // Hash the result (convert to FP8 for consistency)
+    let fp8_data: Vec<FP8> = c_data.iter().map(|&f| FP8::from_f32(f)).collect();
+    let result_bytes: Vec<u8> = fp8_data.iter().flat_map(|fp8| vec![fp8.to_bits()]).collect();
+    let result_hash = Proof::hash_operation_result(&result_bytes);
+
+    Ok((result_hash, flops))
+}
+
+fn execute_gemm_cpu(dimensions: (usize, usize, usize), seed: u64) -> Result<(String, u64)> {
     let (m, k, n) = dimensions;
 
     // Generate random matrices using seed for reproducibility

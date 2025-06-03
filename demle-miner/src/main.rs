@@ -6,6 +6,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 use tracing::{info, warn};
 
+#[cfg(feature = "cuda")]
+use candle_core;
+
 #[derive(Parser)]
 #[command(name = "demle-miner")]
 #[command(about = "DEMLE FP8 ML cryptocurrency miner")]
@@ -89,6 +92,21 @@ impl Miner {
         info!("⛏️  Starting mining with {} threads", self.threads);
         info!("📍 Contract Address: {}", self.config.contract_address);
         info!("🌐 RPC URL: {}", self.config.rpc_url);
+        
+        // Check GPU availability
+        #[cfg(feature = "cuda")]
+        {
+            match candle_core::Device::new_cuda(0) {
+                Ok(_) => info!("🔥 GPU acceleration enabled (CUDA)"),
+                Err(e) => {
+                    warn!("⚠️  GPU not available, falling back to CPU: {}", e);
+                }
+            }
+        }
+        #[cfg(not(feature = "cuda"))]
+        {
+            info!("💻 Running on CPU (compile with --features cuda for GPU acceleration)");
+        }
 
         let mut nonce = 0u64;
 
@@ -125,35 +143,36 @@ impl Miner {
             }
 
             nonce = nonce.wrapping_add(1);
-            sleep(Duration::from_millis(5000)).await; // Slow down to 5 seconds between attempts
+            // Remove artificial delay for maximum H100 utilization
+            sleep(Duration::from_millis(100)).await; // Minimal delay for blockchain polling
         }
     }
 
     async fn generate_work_unit(&self, nonce: u64) -> Result<WorkUnit, Box<dyn std::error::Error>> {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        // Generate a mix of ML operations for mining
+        // Generate larger ML operations optimized for H100 GPU
         let operations = vec![
             MLOperation::MatrixMultiply {
-                dimensions: (256, 256, 256),
+                dimensions: (2048, 2048, 2048), // Much larger for H100
                 seed: nonce,
             },
             MLOperation::Convolution2D {
-                input_shape: (8, 64, 16, 16),
-                kernel_shape: (128, 64, 3, 3),
+                input_shape: (32, 512, 64, 64), // Larger batch and feature maps
+                kernel_shape: (1024, 512, 3, 3),
                 stride: (1, 1),
                 padding: (1, 1),
                 seed: nonce.wrapping_add(1),
             },
             MLOperation::MultiHeadAttention {
-                batch_size: 4,
-                seq_length: 32,
-                d_model: 128,
-                num_heads: 8,
+                batch_size: 16, // Larger batch
+                seq_length: 128, // Longer sequences
+                d_model: 1024, // Larger model dimension
+                num_heads: 16,
                 seed: nonce.wrapping_add(2),
             },
             MLOperation::BatchNormalization {
-                shape: (8, 128, 16, 16),
+                shape: (32, 1024, 64, 64), // Much larger tensors
                 epsilon: 1e-5,
                 seed: nonce.wrapping_add(3),
             },
@@ -178,13 +197,25 @@ impl Miner {
         info!("⚡ Mining work unit: {}", work_unit.id);
         info!("📋 Operations: {}", work_unit.operations.len());
 
+        // Execute operations in parallel for maximum H100 utilization
+        let handles: Vec<_> = work_unit.operations
+            .iter()
+            .enumerate()
+            .map(|(i, operation)| {
+                let op = operation.clone();
+                tokio::spawn(async move {
+                    info!("🔄 Executing operation {} in parallel: {}", i + 1, op);
+                    execute_ml_operation(&op)
+                })
+            })
+            .collect();
+
         let mut operation_results = Vec::new();
         let mut total_flops = 0u64;
 
-        for (i, operation) in work_unit.operations.iter().enumerate() {
-            info!("🔄 Executing operation {}: {}", i + 1, operation);
-
-            let result = execute_ml_operation(operation)?;
+        // Collect results from parallel execution
+        for handle in handles {
+            let result = handle.await??;
             total_flops += result.flops;
             operation_results.push(result);
         }
@@ -215,11 +246,14 @@ impl Miner {
         self.stats.total_operations += result.operation_results.len() as u64;
         self.stats.uptime_seconds = self.start_time.elapsed().as_secs();
 
-        // Calculate rolling averages
+        // Calculate instantaneous TeraFLOPS from this work unit
+        if result.execution_time_ms > 0 {
+            self.stats.teraflops = (result.total_flops as f64) / 1e12 / (result.execution_time_ms as f64 / 1000.0);
+        }
+        
+        // Calculate rolling average hashrate
         let elapsed_secs = self.stats.uptime_seconds as f64;
         if elapsed_secs > 0.0 {
-            self.stats.teraflops =
-                (result.total_flops as f64) / 1e12 / (result.execution_time_ms as f64 / 1000.0);
             self.stats.hashrate = self.stats.total_operations as f64 / elapsed_secs;
         }
     }
@@ -247,19 +281,37 @@ impl Miner {
             "│ 🪙 Tokens:    {:>7}                │",
             self.stats.tokens_earned
         );
+        println!(
+            "│ 🎯 Target:    {:>8.2} TFLOPS/s       │",
+            self.target_teraflops
+        );
+        
+        // Show hardware acceleration status
+        #[cfg(feature = "cuda")]
+        println!("│ 💾 Hardware:  GPU (CUDA)              │");
+        #[cfg(not(feature = "cuda"))]
+        println!("│ 💾 Hardware:  CPU                     │");
+        
         println!("└─────────────────────────────────────────┘");
 
         // Show operation breakdown
         println!("\n🔧 ML Operations Performed:");
-        println!("• Matrix Multiplication (GEMM)");
-        println!("• 2D Convolution (CNN layers)");
-        println!("• Multi-Head Attention (Transformers)");
-        println!("• Batch Normalization");
+        println!("• Matrix Multiplication (GEMM) - 2048³ matrices");
+        println!("• 2D Convolution (CNN layers) - 1024x512 kernels");
+        println!("• Multi-Head Attention (Transformers) - 16 heads");
+        println!("• Batch Normalization - Large tensors");
 
+        // Performance status
         if self.stats.teraflops >= self.target_teraflops {
             println!(
-                "\n🎯 TARGET ACHIEVED! Running at {:.2} TeraFLOPS",
-                self.stats.teraflops
+                "\n🎯 TARGET ACHIEVED! Running at {:.2} TeraFLOPS (Target: {:.2})",
+                self.stats.teraflops, self.target_teraflops
+            );
+        } else if self.stats.teraflops > 0.0 {
+            let efficiency = (self.stats.teraflops / self.target_teraflops) * 100.0;
+            println!(
+                "\n📈 Performance: {:.1}% of target ({:.2}/{:.2} TFLOPS)",
+                efficiency, self.stats.teraflops, self.target_teraflops
             );
         }
 
