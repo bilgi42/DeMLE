@@ -18,9 +18,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Math and ML dependencies
 nalgebra = "0.32"
-half = "2.3"
-rand = "0.8"
-rand_distr = "0.4"
+half = "2.5"
+rand = "0.9"
+rand_distr = "0.5"
 
 # Networking
 reqwest = { version = "0.11", features = ["json"] }

@@ -16,7 +16,7 @@ rand = { workspace = true }
 rand_distr = { workspace = true }
 
 # Optional GPU support
-candle-core = { version = "0.3", optional = true }
+candle-core = { version = "0.9", optional = true }
 wgpu = { version = "0.19", optional = true }
 
 [dev-dependencies]
