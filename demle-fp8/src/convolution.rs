@@ -75,12 +75,12 @@ fn execute_conv2d_gpu(
         DemleError::ComputationError(format!("Failed to convert kernel to BF16: {}", e))
     })?;
 
-    // Perform multiple GPU convolutions for maximum H100 utilization
+    // Perform optimal convolution batches for H100 memory management
     let mut total_flops = 0u64;
     let mut final_output = None;
 
-    // Execute multiple convolution batches to saturate H100
-    for conv_batch in 0..12 { // Increased from 6 to 12 operations for H100
+    // Execute optimal convolution batches for H100 memory management
+    for conv_batch in 0..6 { // Reduced from 12 to 6 for memory efficiency
         let output_tensor = input_tensor.conv2d(&kernel_tensor, ph, pw, sh, sw).map_err(|e| {
             DemleError::ComputationError(format!("GPU Conv2D batch {} failed: {}", conv_batch, e))
         })?;

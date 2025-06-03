@@ -155,57 +155,57 @@ impl Miner {
     async fn generate_work_unit(&self, nonce: u64) -> Result<WorkUnit, Box<dyn std::error::Error>> {
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-        // H100-optimized ML operations - much larger for tensor core utilization
+        // H100-optimized ML operations - balanced for 80GB memory
         let operations = vec![
-            // Massive GEMM operations for H100 tensor cores
+            // Large but memory-efficient GEMM operations for H100 tensor cores
             MLOperation::MatrixMultiply {
-                dimensions: (8192, 8192, 8192), // 2TB FLOPS per operation
+                dimensions: (6144, 6144, 6144), // ~450 GFLOPS per operation, ~9GB memory
                 seed: nonce,
             },
             MLOperation::MatrixMultiply {
-                dimensions: (16384, 8192, 4096), // Mixed dimensions for variety
+                dimensions: (8192, 4096, 4096), // Mixed dimensions, ~270 GFLOPS, ~5GB memory
                 seed: nonce.wrapping_add(1),
             },
             MLOperation::MatrixMultiply {
-                dimensions: (12288, 12288, 6144), // Large asymmetric
+                dimensions: (4096, 8192, 4096), // Different shape, ~270 GFLOPS, ~5GB memory
                 seed: nonce.wrapping_add(2),
             },
             // Large convolution for image processing workloads
             MLOperation::Convolution2D {
-                input_shape: (128, 2048, 256, 256), // Massive batch and feature maps
-                kernel_shape: (4096, 2048, 3, 3),
+                input_shape: (32, 1024, 128, 128), // Large but manageable batch and feature maps
+                kernel_shape: (2048, 1024, 3, 3),
                 stride: (1, 1),
                 padding: (1, 1),
                 seed: nonce.wrapping_add(3),
             },
             // Large transformer attention
             MLOperation::MultiHeadAttention {
-                batch_size: 64,
-                seq_length: 1024, // Long sequences
-                d_model: 4096, // Large model
-                num_heads: 64,
+                batch_size: 32,
+                seq_length: 512, // Long sequences
+                d_model: 2048, // Large model
+                num_heads: 32,
                 seed: nonce.wrapping_add(4),
             },
             MLOperation::MultiHeadAttention {
-                batch_size: 128,
-                seq_length: 512,
-                d_model: 8192, // Huge model
-                num_heads: 128,
+                batch_size: 64,
+                seq_length: 256,
+                d_model: 4096, // Very large model
+                num_heads: 64,
                 seed: nonce.wrapping_add(5),
             },
             // Large batch normalization
             MLOperation::BatchNormalization {
-                shape: (128, 4096, 256, 256), // Massive tensors
+                shape: (64, 2048, 128, 128), // Large tensors but memory-efficient
                 epsilon: 1e-5,
                 seed: nonce.wrapping_add(6),
             },
-            // Additional GEMM operations to saturate H100
+            // Additional memory-optimized GEMM operations
             MLOperation::MatrixMultiply {
-                dimensions: (20480, 10240, 5120), // Even larger
+                dimensions: (12288, 4096, 3072), // Asymmetric for variety, ~300 GFLOPS
                 seed: nonce.wrapping_add(7),
             },
             MLOperation::MatrixMultiply {
-                dimensions: (24576, 8192, 8192), // Max tensor core utilization
+                dimensions: (8192, 6144, 4096), // High compute density, ~400 GFLOPS
                 seed: nonce.wrapping_add(8),
             },
         ];
