@@ -107,8 +107,8 @@ impl GpuMiner {
         let k_reshaped = k_heads.reshape((batch_size * num_heads, seq_length, head_dim))?;
         let v_reshaped = v_heads.reshape((batch_size * num_heads, seq_length, head_dim))?;
         
-        let scores = q_reshaped.matmul(&k_reshaped.transpose(1, 2)?)?;
-        let _attention_out = scores.matmul(&v_reshaped)?;
+        let scores = q_reshaped.contiguous()?.matmul(&k_reshaped.transpose(1, 2)?.contiguous()?)?;
+        let _attention_out = scores.contiguous()?.matmul(&v_reshaped.contiguous()?)?;
         
         // FLOPs for attention: 2 * batch * heads * seq^2 * head_dim for QK^T, 2 * batch * heads * seq^2 * head_dim for softmax*V
         let flops = 4 * batch_size * num_heads * seq_length * seq_length * head_dim;

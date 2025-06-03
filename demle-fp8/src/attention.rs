@@ -80,14 +80,14 @@ fn execute_attention_gpu(
     for iteration in 0..8 { // Multiple iterations to maximize H100 usage
         // Compute attention scores (Q @ K^T) with scaling
         let scale = (d_k as f32).sqrt();
-        let scores = q_heads.matmul(&k_heads.transpose(2, 3)?)?
+        let scores = q_heads.contiguous()?.matmul(&k_heads.transpose(2, 3)?.contiguous()?)?
             .broadcast_div(&Tensor::new(scale, &device)?.to_dtype(DType::BF16)?)?;
 
         // Apply softmax (simplified for performance)
         let attention_weights = scores.exp()?; // Simplified softmax for GPU efficiency
 
         // Apply attention to values (scores @ V)
-        let attention_output = attention_weights.matmul(&v_heads)?;
+        let attention_output = attention_weights.contiguous()?.matmul(&v_heads.contiguous()?)?;
 
         // Reshape back to original format
         let output = attention_output.transpose(1, 2)?
