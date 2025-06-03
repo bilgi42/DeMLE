@@ -28,6 +28,9 @@ ratatui = { workspace = true }
 # CLI
 clap = { version = "4.4", features = ["derive"] }
 
+# Utilities
+md5 = "0.7"
+
 # Metrics and monitoring
 metrics = "0.21"
 metrics-exporter-prometheus = { version = "0.12", optional = true }

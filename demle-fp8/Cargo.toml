@@ -17,7 +17,7 @@ rand_distr = { workspace = true }
 
 # Optional GPU support
 candle-core = { version = "0.3", optional = true }
-wgpu = { version = "0.18", optional = true }
+wgpu = { version = "0.19", optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -26,8 +26,4 @@ proptest = { workspace = true }
 [features]
 default = []
 gpu = ["candle-core", "wgpu"]
-cuda = ["candle-core/cuda"]
-
-[[bench]]
-name = "fp8_operations"
-harness = false 
+cuda = ["candle-core/cuda"] 

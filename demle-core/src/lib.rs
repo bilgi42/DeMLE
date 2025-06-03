@@ -4,6 +4,7 @@ pub mod difficulty;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use thiserror::Error;
 
 /// DEMLE network configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,27 +30,16 @@ impl Default for NetworkConfig {
     }
 }
 
-/// Mining work unit containing ML operations to perform
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkUnit {
-    pub id: String,
-    pub previous_hash: String,
-    pub timestamp: u64,
-    pub difficulty: u64,
-    pub operations: Vec<MLOperation>,
-    pub nonce_range: (u64, u64),
-}
-
-/// Machine learning operation types for mining
+/// Machine learning operation types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MLOperation {
     MatrixMultiply {
-        dimensions: (usize, usize, usize), // (m, k, n) for A(m×k) × B(k×n) = C(m×n)
+        dimensions: (usize, usize, usize),
         seed: u64,
     },
     Convolution2D {
-        input_shape: (usize, usize, usize, usize), // (batch, channels, height, width)
-        kernel_shape: (usize, usize, usize, usize), // (out_ch, in_ch, kh, kw)
+        input_shape: (usize, usize, usize, usize),
+        kernel_shape: (usize, usize, usize, usize),
         stride: (usize, usize),
         padding: (usize, usize),
         seed: u64,
@@ -62,68 +52,51 @@ pub enum MLOperation {
         seed: u64,
     },
     BatchNormalization {
-        shape: (usize, usize, usize, usize), // (batch, channels, height, width)
+        shape: (usize, usize, usize, usize),
         epsilon: f32,
         seed: u64,
     },
 }
 
-impl MLOperation {
-    /// Estimate the number of FP8 operations for this ML operation
-    pub fn estimated_flops(&self) -> u64 {
-        match self {
-            MLOperation::MatrixMultiply { dimensions: (m, k, n), .. } => {
-                2 * (*m as u64) * (*k as u64) * (*n as u64)
-            }
-            MLOperation::Convolution2D {
-                input_shape: (batch, _, ih, iw),
-                kernel_shape: (out_ch, in_ch, kh, kw),
-                stride: (sh, sw),
-                ..
-            } => {
-                let oh = (ih + 2 * 0 - kh) / sh + 1; // assuming no padding for simplicity
-                let ow = (iw + 2 * 0 - kw) / sw + 1;
-                2 * (*batch as u64) * (*out_ch as u64) * (*in_ch as u64) * 
-                    (*kh as u64) * (*kw as u64) * (oh as u64) * (ow as u64)
-            }
-            MLOperation::MultiHeadAttention {
-                batch_size, seq_length, d_model, num_heads, ..
-            } => {
-                // Simplified FLOPS estimation for attention
-                let d_k = d_model / num_heads;
-                let qkv_proj = 3 * (*batch_size as u64) * (*seq_length as u64) * (*d_model as u64) * (*d_model as u64);
-                let attention = (*batch_size as u64) * (*num_heads as u64) * (*seq_length as u64) * (*seq_length as u64) * (d_k as u64);
-                let output_proj = (*batch_size as u64) * (*seq_length as u64) * (*d_model as u64) * (*d_model as u64);
-                qkv_proj + 2 * attention + output_proj
-            }
-            MLOperation::BatchNormalization { shape: (batch, channels, height, width), .. } => {
-                // Forward pass: mean, variance, normalize
-                6 * (*batch as u64) * (*channels as u64) * (*height as u64) * (*width as u64)
-            }
-        }
-    }
-}
-
 impl fmt::Display for MLOperation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MLOperation::MatrixMultiply { dimensions: (m, k, n), .. } => {
-                write!(f, "GEMM({}×{}×{})", m, k, n)
-            }
-            MLOperation::Convolution2D { input_shape, kernel_shape, .. } => {
-                write!(f, "Conv2D({:?}⊛{:?})", input_shape, kernel_shape)
-            }
-            MLOperation::MultiHeadAttention { seq_length, d_model, num_heads, .. } => {
-                write!(f, "MHA(L={}, D={}, H={})", seq_length, d_model, num_heads)
-            }
+            MLOperation::MatrixMultiply { dimensions, .. } => {
+                write!(f, "GEMM {}x{}x{}", dimensions.0, dimensions.1, dimensions.2)
+            },
+            MLOperation::Convolution2D { kernel_shape, .. } => {
+                write!(f, "Conv2D {}x{}x{}x{}", kernel_shape.0, kernel_shape.1, kernel_shape.2, kernel_shape.3)
+            },
+            MLOperation::MultiHeadAttention { num_heads, d_model, .. } => {
+                write!(f, "Attention {}heads x {}", num_heads, d_model)
+            },
             MLOperation::BatchNormalization { shape, .. } => {
-                write!(f, "BatchNorm({:?})", shape)
-            }
+                write!(f, "BatchNorm {}x{}x{}x{}", shape.0, shape.1, shape.2, shape.3)
+            },
         }
     }
 }
 
-/// Result of executing a work unit
+/// Result of an ML operation execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperationResult {
+    pub result_hash: String,
+    pub flops: u64,
+    pub execution_time_ms: u64,
+}
+
+/// Work unit for mining
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkUnit {
+    pub id: String,
+    pub previous_hash: String,
+    pub timestamp: u64,
+    pub difficulty: u64,
+    pub operations: Vec<MLOperation>,
+    pub nonce_range: (u64, u64),
+}
+
+/// Result of mining a work unit
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkResult {
     pub work_id: String,
@@ -134,31 +107,21 @@ pub struct WorkResult {
     pub operation_results: Vec<OperationResult>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperationResult {
-    pub operation_type: String,
-    pub execution_time_ms: u64,
-    pub flops: u64,
-    pub result_hash: String, // Hash of the output tensor
-}
-
-/// Error types for DEMLE operations
-#[derive(Debug, thiserror::Error)]
+/// DEMLE-specific error types
+#[derive(Error, Debug)]
 pub enum DemleError {
-    #[error("Invalid work unit: {0}")]
-    InvalidWorkUnit(String),
-    
-    #[error("Computation failed: {0}")]
+    #[error("Computation error: {0}")]
     ComputationError(String),
     
     #[error("Network error: {0}")]
     NetworkError(String),
     
-    #[error("Proof verification failed: {0}")]
-    ProofVerificationError(String),
+    #[error("Validation error: {0}")]
+    ValidationError(String),
     
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
 }
 
+/// Result type for DEMLE operations
 pub type Result<T> = std::result::Result<T, DemleError>; 
