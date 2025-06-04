@@ -82,3 +82,21 @@ Rust Miner (FP8 Operations) ↔ Smart Contract (Proof Verification) ↔ Blockcha
 ```
 
 **Target**: Demonstrate productive mining that contributes to AI compute instead of wasting energy on arbitrary calculations.
+
+## Considerations
+
+This is just a showcase for a potential system architecture. There's no kind of optimizations, pytorch or any kind of an actual widely used ML library support at the time.
+That being said, there's a bigger challenge in this system, verifying the proof
+Probabilistic Sampling and reputation based proof of work systems can be implemented in the future
+And maybe for faster execution speeds, there might be standalone primitive blockchain written in Rust that is just used for this project, but I didn't do that since project participation required the project to be in Ethereum network
+
+## FAQ
+
+>Isn't this slower than just spinning up a GPU Cluster?
+
+Yes, it is. The main feature itself is not the execution speed, but the decentralization aspect. Governments are thinking of restricting processing power access to the countries they don't like, whether they can afford it or not. What we're trying to achieve is distribution of computing process and a reward mechanism attached to it
+
+>Aren't there any other compaines trying to implement decentralised computing?
+
+Again, yes, there is. One of them, Prime Intellect, is one of my favorite companies in 2025. But that being said, they're subject to US law, that comes from being a company, a centralized entity. One of the biggest adcantages of being deployed in a blockchain is that it's nearly untouchable from any entity.
+
