@@ -86,8 +86,11 @@ Rust Miner (FP8 Operations) ↔ Smart Contract (Proof Verification) ↔ Blockcha
 ## Considerations
 
 This is just a showcase for a potential system architecture. There's no kind of optimizations, pytorch or any kind of an actual widely used ML library support at the time.
+
 That being said, there's a bigger challenge in this system, verifying the proof
+
 Probabilistic Sampling and reputation based proof of work systems can be implemented in the future
+
 And maybe for faster execution speeds, there might be standalone primitive blockchain written in Rust that is just used for this project, but I didn't do that since project participation required the project to be in Ethereum network
 
 ## FAQ
